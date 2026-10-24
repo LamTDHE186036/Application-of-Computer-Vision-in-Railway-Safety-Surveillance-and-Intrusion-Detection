@@ -1,0 +1,29 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Large dataset & archives (GitHub giới hạn < 100MB, Dataset.zip nặng 626MB)
+Dataset.zip
+*.zip
+*.tar.gz
+*.rar
+
+# Video tạm & file lịch sử ghi hình
+temp_video.mp4
+lichsu_video/*
+!lichsu_video/.gitkeep
+lichsu_xampham/*
+!lichsu_xampham/.gitkeep
+runs/
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# IDEs & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

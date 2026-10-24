@@ -1,0 +1,50 @@
+:root {
+    --primary: #0d828a;
+    --primary-hover: #0a6c73;
+    --primary-light: #e3f5f5;
+    --primary-text: #08767e;
+    --bg-body: #f8fafc;
+    --card-bg: #ffffff;
+    --border: #e2e8f0;
+    --border-hover: #cbd5e1;
+    --text-main: #16304d;
+    --text-secondary: #52677e;
+    --text-muted: #71859a;
+    --text-light: #8294aa;
+    --danger: #ef4444;
+    --danger-hover: #dc2626;
+    --danger-bg: #fef2f2;
+    --danger-border: #fecaca;
+    --danger-text: #b91c1c;
+    --success: #10b981;
+    --success-bg: #ecfdf5;
+    --success-border: #a7f3d0;
+    --success-text: #047857;
+    --warning: #f59e0b;
+    --stage-bg: #142031;
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.06);
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+    background: var(--bg-body);
+    color: var(--text-main);
+    min-height: 100vh;
+    overflow-x: hidden;
+    line-height: 1.5;
+}
+
+button, input {
+    font: inherit;
+}
+

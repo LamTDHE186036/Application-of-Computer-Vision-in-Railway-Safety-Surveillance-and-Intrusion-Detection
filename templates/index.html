@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giám sát an toàn đường sắt - Hệ thống Camera AI</title>
+    <!-- CSS Stylesheets -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/sidebar-topbar.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/monitor.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modal.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/history.css') }}?v=7">
+</head>
+<body>
+    <!-- ===== SIDEBAR (Trái) ===== -->
+    <aside class="sidebar">
+        <div class="rail-logo" title="Railway Safety Surveillance">
+            <!-- Train / Railway SVG icon -->
+            <svg viewBox="0 0 32 32" width="28" height="28" fill="none" aria-hidden="true">
+                <rect x="7" y="3" width="18" height="21" rx="4" stroke="currentColor" stroke-width="2"/>
+                <path d="M8 14h16M12 27l-3 3m11-3 3 3M12 7h8" stroke="currentColor" stroke-width="2"/>
+                <circle cx="12" cy="19" r="1.5" fill="currentColor"/>
+                <circle cx="20" cy="19" r="1.5" fill="currentColor"/>
+            </svg>
+        </div>
+        <nav aria-label="Điều hướng">
+            <button class="nav-item active" id="nav_btn_monitor" onclick="switchMainView('monitor')" title="Giám sát video">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+                    <line x1="7" y1="2" x2="7" y2="22"></line>
+                    <line x1="17" y1="2" x2="17" y2="22"></line>
+                    <line x1="2" y1="12" x2="22" y2="12"></line>
+                    <line x1="2" y1="7" x2="7" y2="7"></line>
+                    <line x1="2" y1="17" x2="7" y2="17"></line>
+                    <line x1="17" y1="17" x2="22" y2="17"></line>
+                    <line x1="17" y1="7" x2="22" y2="7"></line>
+                </svg>
+                <span>Phân tích</span>
+            </button>
+            <button class="nav-item" id="nav_btn_history" onclick="switchMainView('history')" title="Lịch sử vi phạm">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                <span>Lịch sử</span>
+            </button>
+            <button class="nav-item" id="nav_btn_settings" onclick="openSettingsModal()" title="Cài đặt">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+                <span>Cài đặt</span>
+            </button>
+        </nav>
+        <div class="sidebar-bottom">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span>LOCAL</span>
+        </div>
+    </aside>
+
+    <!-- ===== TOPBAR (Trên) ===== -->
+    <header class="topbar">
+        <div class="heading">
+            <h1>Giám sát an toàn đường sắt</h1>
+            <p>Phân tích video · Theo dõi đối tượng · Cảnh báo xâm nhập</p>
+        </div>
+        <div class="header-right">
+            <span class="data-tag" id="system_status_tag">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                    <circle cx="12" cy="12" r="8"/>
+                </svg>
+                HỆ THỐNG SẴN SÀNG
+            </span>
+            <div class="clock">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                <div>
+                    <strong id="topbar_time">--:--:--</strong>
+                    <span id="topbar_date">--/--/----</span>
+                </div>
+            </div>
+            <div class="user-badge">
+                <div class="user-avatar">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                </div>
+                <div class="user-label">
+                    Người dùng
+                    <small>Phiên cục bộ</small>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ===== MAIN CONTENT ===== -->
+    <main class="main-content">
+        <!-- Chế độ 1: Giám sát trực tiếp (Phân tích) -->
+        <div id="view_monitor" class="app-view active">
+            <!-- Cột trái: Bảng điều khiển (Control Panel) -->
+            <div class="control-panel">
+            <!-- Card 1: Nguồn giám sát -->
+            <section class="control-card">
+                <h2>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                    </svg>
+                    Nguồn hình ảnh
+                </h2>
+
+                <div class="segmented-group">
+                    <button class="mode-btn active" id="btn_vid" onclick="setMode('video')">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        Tải video
+                    </button>
+                    <button class="mode-btn" id="btn_cam" onclick="setMode('webcam')">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
+                        Webcam
+                    </button>
+                </div>
+
+                <!-- Chế độ Video -->
+                <div id="sec_video" class="upload-section active">
+                    <div class="upload-zone" id="zone_video">
+                        <div class="thumb-preview-wrap">
+                            <button class="clear-btn" title="Hủy chọn video" onclick="clearMedia('video', event)">✕</button>
+                            <img id="thumb_video" class="thumb-preview" src="" alt="Hình xem trước">
+                        </div>
+                        <div class="upload-content">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"></path>
+                                <polyline points="16 16 12 12 8 16"></polyline>
+                                <line x1="12" y1="12" x2="12" y2="21"></line>
+                            </svg>
+                            <p id="vid_status_text">Kéo thả hoặc tải video lên</p>
+                            <span>MP4, AVI, MKV, MOV · Tối đa 2 GB</span>
+                        </div>
+                        <input type="file" id="input_video" accept="video/*" onchange="uploadVideoPreview(event)">
+                    </div>
+                </div>
+
+                <!-- Chế độ Webcam Guide -->
+                <div id="sec_webcam" class="upload-section">
+                    <div class="webcam-guide">
+                        <strong>Chế độ Webcam trực tiếp:</strong>
+                        <span>Hệ thống sẽ kết nối trực tiếp với camera thiết bị để nhận diện thời gian thực.</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Card 2: Chế độ giám sát đường ngang -->
+            <section class="control-card alarm-card">
+                <h2>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    Chế độ
+                </h2>
+
+                <div class="mode-train-controls">
+                    <button class="btn-mode-train active" id="btn_mode_train" onclick="setTrainMode('train_approaching')" title="Cảnh báo tức thì khi có vật thể trong ROI">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="4" y="3" width="16" height="16" rx="2"></rect>
+                            <path d="M4 11h16"></path>
+                            <path d="M12 3v8"></path>
+                            <path d="m8 19-2 3"></path>
+                            <path d="m16 19 2 3"></path>
+                        </svg>
+                        Tàu sắp tới
+                    </button>
+                    <button class="btn-mode-train" id="btn_mode_notrain" onclick="setTrainMode('no_train')" title="Chỉ cảnh báo khi vật thể dừng đỗ quá thời gian cài đặt">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg>
+                        Không có tàu
+                    </button>
+                </div>
+
+                <div id="alarm_header" class="alarm-status-box alarm-safe">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+                    </svg>
+                    <div class="alarm-status-info">
+                        <strong id="alarm_text">An toàn</strong>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Card 3: Vùng nguy hiểm (ROI) -->
+            <section class="control-card">
+                <h2>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+                    </svg>
+                    Vùng nguy hiểm
+                </h2>
+
+                <div class="roi-controls">
+                    <button class="btn-roi" onclick="enableROIDraw()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 20h9"></path>
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                        </svg>
+                        Vẽ vùng
+                    </button>
+                    <button class="btn-roi" onclick="clearROI()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                        Xóa
+                    </button>
+                    <button class="btn-roi btn-roi-primary" onclick="saveROI()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                            <polyline points="7 3 7 8 15 8"></polyline>
+                        </svg>
+                        Lưu
+                    </button>
+                </div>
+
+                <div class="roi-meta-row">
+                    <span id="roi_point_count">0 điểm đã chọn</span>
+                    <button type="button" style="border:none; background:none; color:var(--text-muted); cursor:pointer; font-size:11px;" onclick="undoLastPoint()">Bỏ điểm cuối</button>
+                </div>
+
+                <div class="roi-status-hint" id="roi_status_hint">
+                    <span class="roi-status-dot"></span>
+                    <span id="roi_status_text">Chưa có vùng nguy hiểm</span>
+                </div>
+            </section>
+        </div>
+
+        <!-- Cột phải: Media Stage & Nhật ký cảnh báo -->
+        <div class="media-column">
+            <!-- Cột Video -->
+            <div class="video-stack">
+                <section class="media-card">
+                    <div class="media-toolbar">
+                        <div class="media-toolbar-left">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+                                <line x1="7" y1="2" x2="7" y2="22"></line>
+                                <line x1="17" y1="2" x2="17" y2="22"></line>
+                                <line x1="2" y1="12" x2="22" y2="12"></line>
+                                <line x1="2" y1="7" x2="7" y2="7"></line>
+                                <line x1="2" y1="17" x2="7" y2="17"></line>
+                                <line x1="17" y1="17" x2="22" y2="17"></line>
+                                <line x1="17" y1="7" x2="22" y2="7"></line>
+                            </svg>
+                            <span id="media_title_text">Video giám sát AI</span>
+                        </div>
+                        <span class="status-badge" id="media_status_badge">CHỜ NGUỒN PHÁT</span>
+                    </div>
+
+                    <div class="camera-box" id="cam_container">
+                        <!-- Placeholder khi chưa có video/stream -->
+                        <div class="media-empty-placeholder" id="media_placeholder">
+                            <div class="empty-frame-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                                </svg>
+                            </div>
+                            <h3>Chưa có nguồn giám sát</h3>
+                            <p>Tải video lên từ cột trái hoặc chuyển sang chế độ Webcam để bắt đầu.</p>
+                            <span>Hình ảnh phát hiện xâm nhập sẽ hiển thị trực tiếp tại đây.</span>
+                        </div>
+
+                        <div class="cam-wrapper">
+                            <img id="main_preview" src="" alt="Camera preview">
+                            <canvas id="roi_canvas"></canvas>
+                            <canvas id="roi_display_canvas"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="media-footer">
+                        <div class="legend-indicator">
+                            <span class="legend-square roi"></span> Vùng ROI nguy hiểm
+                            <span class="legend-square safe" style="margin-left: 10px;"></span> An toàn
+                            <span class="legend-square alarm" style="margin-left: 10px;"></span> Xâm nhập
+                        </div>
+                        <span id="media_resolution_info">Camera đường sắt cố định</span>
+                    </div>
+                </section>
+
+                <!-- Nút hành động chính: Bắt đầu / Dừng giám sát -->
+                <div class="main-actions">
+                    <button class="btn-action btn-monitor-start" id="btn_monitor_toggle" onclick="toggleMonitor()">
+                        <span id="monitor_icon">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                            </svg>
+                        </span>
+                        <span id="monitor_text">Bắt đầu giám sát</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Cột Phải: Nhật ký sự kiện -->
+            <div class="right-stack">
+                <section class="event-card">
+                    <div class="events-header">
+                        <div class="events-header-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                            <span>Trạng thái & Nhật ký</span>
+                        </div>
+                        <span class="date-badge" id="current_date_label">--/--/----</span>
+                    </div>
+
+                    <div class="events-list" id="events_log">
+                        <div class="event-empty-state">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>
+                            <span>Chưa có sự kiện cảnh báo nào được ghi nhận.</span>
+                        </div>
+                    </div>
+
+                    <div class="event-footer-note">
+                        Thời gian tính theo luồng giám sát thực tế. Tự động lưu vết cảnh báo khi có vi phạm vùng nguy hiểm.
+                    </div>
+                </section>
+            </div>
+        </div>
+        </div>
+
+        <!-- Chế độ 2: Tra cứu Lịch sử vi phạm (Lịch sử) -->
+        <div id="view_history" class="app-view" style="display: none;">
+            <!-- Header bar của Lịch sử -->
+            <div class="history-top-bar">
+                <div class="history-top-left">
+                    <div class="history-title-row">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <h2>Lịch sử vi phạm vùng nguy hiểm</h2>
+                    </div>
+                    <p>Tra cứu sự kiện vi phạm an toàn đường sắt theo ngày và phát lại video tương ứng</p>
+                </div>
+                <div class="history-top-right">
+                    <div class="live-bg-badge idle" id="history_bg_monitor_badge">
+                        <span class="live-bg-dot"></span>
+                        <span id="history_bg_monitor_text">Camera đang tạm dừng</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Khung 2 cột: Cột trái (Bộ lọc & Danh sách) - Cột phải (Video Player) -->
+            <div class="history-grid">
+                <!-- Cột trái: Bộ lọc ngày & Danh sách sự kiện -->
+                <div class="history-sidebar-column">
+                    <!-- Card 1: Chọn ngày & Bộ lọc -->
+                    <section class="control-card history-filter-card">
+                        <div class="history-card-header">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="16" y1="2" x2="16" y2="6"></line>
+                                <line x1="8" y1="2" x2="8" y2="6"></line>
+                                <line x1="3" y1="10" x2="21" y2="10"></line>
+                            </svg>
+                            <span>Chọn ngày tra cứu</span>
+                        </div>
+
+                        <!-- Date input -->
+                        <div class="history-date-box">
+                            <input type="date" id="history_date_input" class="history-date-input" onchange="onHistoryDatePicked(this.value)">
+                        </div>
+
+                        <!-- Lọc theo loại đối tượng -->
+                        <div class="history-card-header" style="margin-top: 14px;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                            </svg>
+                            <span>Lọc đối tượng</span>
+                        </div>
+
+                        <div class="class-filter-chips">
+                            <button type="button" class="chip-filter active" data-class="all" onclick="filterHistoryClass('all')">Tất cả</button>
+                            <button type="button" class="chip-filter" data-class="Người" onclick="filterHistoryClass('Người')">Người</button>
+                            <button type="button" class="chip-filter" data-class="Ô tô" onclick="filterHistoryClass('Ô tô')">Ô tô</button>
+                            <button type="button" class="chip-filter" data-class="Xe máy/Xe đạp" onclick="filterHistoryClass('Xe máy/Xe đạp')">Xe máy/đạp</button>
+                            <button type="button" class="chip-filter" data-class="Xe tải/Xe buýt" onclick="filterHistoryClass('Xe tải/Xe buýt')">Xe tải/buýt</button>
+                        </div>
+
+                        <!-- Thống kê nhỏ -->
+                        <div class="history-stats-row">
+                            <span id="history_stat_text">Đang tải danh sách...</span>
+                            <button type="button" class="btn-refresh-history" onclick="reloadHistoryEvents()" title="Làm mới">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="23 4 23 10 17 10"></polyline>
+                                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                                </svg>
+                                Cập nhật
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- Card 2: Danh sách sự kiện vi phạm -->
+                    <section class="control-card history-list-card">
+                        <div class="history-card-header">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="8" y1="6" x2="21" y2="6"></line>
+                                <line x1="8" y1="12" x2="21" y2="12"></line>
+                                <line x1="8" y1="18" x2="21" y2="18"></line>
+                                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                            </svg>
+                            <span>Danh sách sự kiện vi phạm (<span id="history_count_badge">0</span>)</span>
+                        </div>
+
+                        <div class="history-events-container" id="history_events_container">
+                            <div class="history-empty-box">
+                                <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                </svg>
+                                <span>Chưa có dữ liệu vi phạm cho ngày này.</span>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Cột phải: Trình phát video vi phạm -->
+                <div class="history-player-column">
+                    <section class="media-card history-player-card">
+                        <!-- Player Header -->
+                        <div class="media-toolbar">
+                            <div class="media-toolbar-left">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                </svg>
+                                <span id="history_player_title">Trình phát video vi phạm</span>
+                            </div>
+                            <span class="status-badge" id="history_player_badge">CHƯA CHỌN VIDEO</span>
+                        </div>
+
+                        <!-- Video Stage -->
+                        <div class="history-video-stage" id="history_video_stage">
+                            <!-- Empty state khi chưa chọn sự kiện -->
+                            <div class="player-empty-placeholder" id="history_player_placeholder">
+                                <div class="empty-frame-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                                    </svg>
+                                </div>
+                                <h3>Chọn một sự kiện vi phạm bên trái</h3>
+                                <p>Hệ thống sẽ tải và phát video vi phạm tương ứng lưu trong thư mục <code style="color:var(--primary); font-weight:600;">lichsu_video</code>.</p>
+                                <span>Camera và hệ thống AI vẫn tiếp tục giám sát bình thường.</span>
+                            </div>
+
+                            <!-- Native HTML5 Video Element -->
+                            <video id="history_video_element" playsinline preload="auto" style="display:none; width:100%; height:100%; object-fit:contain; background:#000;"></video>
+
+                            <!-- MJPEG Fallback Stream Element (nếu codec mp4v không chạy trực tiếp) -->
+                            <img id="history_stream_fallback" style="display:none; width:100%; height:100%; object-fit:contain; background:#000;" alt="Fallback Stream">
+                        </div>
+
+                        <!-- Custom Video Timeline Bar (Thanh tua video trực quan phút:giây) -->
+                        <div class="history-timeline-bar" id="history_timeline_bar">
+                            <button type="button" class="timeline-play-btn" id="btn_history_seek_backward" onclick="seekRelative(-5)" title="Tua lùi 5 giây" style="font-size: 11px; font-weight: 700; width: 34px;">-5s</button>
+                            <button type="button" class="timeline-play-btn" id="btn_history_play_toggle" onclick="toggleHistoryVideoPlay()" title="Phát / Tạm dừng">
+                                <svg viewBox="0 0 24 24" id="icon_history_play"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                            </button>
+                            <button type="button" class="timeline-play-btn" id="btn_history_seek_forward" onclick="seekRelative(5)" title="Tua tới 5 giây" style="font-size: 11px; font-weight: 700; width: 34px;">+5s</button>
+                            <span class="timeline-time" id="history_time_current">00:00</span>
+                            <div class="timeline-slider-wrap">
+                                <input type="range" class="timeline-slider" id="history_timeline_slider" min="0" max="100" value="0" step="0.1" oninput="onHistoryTimelineInput(this.value)" onchange="onHistoryTimelineChange(this.value)">
+                            </div>
+                            <span class="timeline-time" id="history_time_total">00:00</span>
+                        </div>
+
+                        <!-- Player Footer Info & Tools -->
+                        <div class="history-player-footer">
+                            <div class="player-meta-left">
+                                <div id="history_meta_event" class="player-meta-event">--</div>
+                                <div id="history_meta_file" class="player-meta-file">--</div>
+                            </div>
+                            <div class="player-actions-right">
+                                <div class="speed-control-group">
+                                    <span style="font-size:11px; color:var(--text-muted);">Tốc độ:</span>
+                                    <button type="button" class="btn-speed" onclick="setVideoSpeed(0.5)">0.5x</button>
+                                    <button type="button" class="btn-speed active" id="btn_speed_1" onclick="setVideoSpeed(1)">1x</button>
+                                    <button type="button" class="btn-speed" onclick="setVideoSpeed(1.5)">1.5x</button>
+                                    <button type="button" class="btn-speed" onclick="setVideoSpeed(2)">2x</button>
+                                </div>
+                                <button type="button" class="btn-player-action" id="btn_download_video" onclick="downloadCurrentVideo()" title="Tải video vi phạm này về máy">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="7 10 12 15 17 10"></polyline>
+                                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                                    </svg>
+                                    Tải video
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ===== MODAL CÀI ĐẶT THAM SỐ AI ===== -->
+    <div class="modal-backdrop" id="settings_modal" onclick="if(event.target === this) closeSettingsModal()">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    <span>Cài đặt hệ thống AI</span>
+                </div>
+                <button class="modal-close-btn" onclick="closeSettingsModal()" title="Đóng">✕</button>
+            </div>
+
+            <div class="modal-body">
+                <!-- 1. Độ tin cậy -->
+                <div class="setting-section">
+                    <label class="setting-title">
+                        <span>1. Ngưỡng độ tin cậy phát hiện </span>
+                        <input type="number" id="modal_conf_input" min="0.1" max="1.0" step="0.05" value="0.5" class="conf-badge-input" onchange="syncModalConf(this.value)">
+                    </label>
+                    <div class="slider-wrap" style="padding-top: 6px;">
+                        <input type="range" id="modal_conf_slider" min="0.1" max="1.0" step="0.05" value="0.5" oninput="syncModalConf(this.value)">
+                    </div>
+                    <div class="setting-hint">Ngưỡng càng cao giúp giảm cảnh báo ảo, ngưỡng thấp giúp phát hiện vật thể ở xa hoặc khuất mờ hơn. (Mặc định: 0.50)</div>
+                </div>
+
+                <!-- 2. Thời gian dừng đỗ khi không có tàu -->
+                <div class="setting-section">
+                    <label class="setting-title">
+                        <span>2. Thời gian dừng đỗ cho phép</span>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <input type="number" id="modal_dwell_input" min="1" max="60" step="1" value="5" class="conf-badge-input" onchange="syncModalDwell(this.value)">
+                            <span style="font-size: 12px; color: var(--text-secondary); font-weight: 600;">giây</span>
+                        </div>
+                    </label>
+                    <div class="slider-wrap" style="padding-top: 6px;">
+                        <input type="range" id="modal_dwell_slider" min="1" max="30" step="1" value="5" oninput="syncModalDwell(this.value)">
+                    </div>
+                    <div class="setting-hint">Ở chế độ "Không có tàu", vật thể dừng đỗ trong vùng ROI quá số giây này mới kích hoạt cảnh báo vi phạm. (Mặc định: 5 giây)</div>
+                </div>
+
+                <!-- 3. Lớp đối tượng nhận dạng -->
+                <div class="setting-section">
+                    <div class="setting-title-row">
+                        <label class="setting-title">3. Đối tượng nhận dạng vi phạm</label>
+                        <div class="select-all-actions">
+                            <button type="button" class="btn-text-action" onclick="toggleAllClasses(true)">Chọn tất cả</button>
+                            <span style="color: var(--border);">|</span>
+                            <button type="button" class="btn-text-action" onclick="toggleAllClasses(false)">Bỏ chọn</button>
+                        </div>
+                    </div>
+                    <div class="setting-hint">Chọn đối tượng cần khoanh vùng, lưu lịch sử và kích hoạt chuông cảnh báo:</div>
+
+                    <div class="classes-grid">
+                        <label class="class-card" id="card_person">
+                            <input type="checkbox" id="class_person" value="person" class="class-checkbox" onchange="onClassCheckboxChange(this)">
+                            <div class="class-card-content">
+                                <div class="class-icon person">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="12" cy="7" r="4"></circle>
+                                    </svg>
+                                </div>
+                                <div class="class-info">
+                                    <strong>Người</strong>
+                                </div>
+                            </div>
+                        </label>
+
+                        <label class="class-card" id="card_car">
+                            <input type="checkbox" id="class_car" value="car" class="class-checkbox" onchange="onClassCheckboxChange(this)">
+                            <div class="class-card-content">
+                                <div class="class-icon car">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                                        <line x1="2" y1="10" x2="22" y2="10"></line>
+                                    </svg>
+                                </div>
+                                <div class="class-info">
+                                    <strong>Ô tô</strong>
+                                </div>
+                            </div>
+                        </label>
+
+                        <label class="class-card" id="card_truck_bus">
+                            <input type="checkbox" id="class_truck_bus" value="truck-bus" class="class-checkbox" onchange="onClassCheckboxChange(this)">
+                            <div class="class-card-content">
+                                <div class="class-icon truck">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="1" y="3" width="15" height="13"></rect>
+                                        <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                                        <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                                        <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                                    </svg>
+                                </div>
+                                <div class="class-info">
+                                    <strong>Xe tải / Xe buýt</strong>
+                                </div>
+                            </div>
+                        </label>
+
+                        <label class="class-card" id="card_motorcycle">
+                            <input type="checkbox" id="class_motorcycle" value="motorcycle" class="class-checkbox" onchange="onClassCheckboxChange(this)">
+                            <div class="class-card-content">
+                                <div class="class-icon moto">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="5" cy="16" r="3"></circle>
+                                        <circle cx="19" cy="16" r="3"></circle>
+                                        <path d="M12 17l4-9-5-2-4 7h5z"></path>
+                                    </svg>
+                                </div>
+                                <div class="class-info">
+                                    <strong>Xe máy / Xe đạp</strong>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-modal-cancel" onclick="closeSettingsModal()">Hủy</button>
+                <button type="button" class="btn-modal-save" onclick="saveSettingsFromModal()">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                        <polyline points="7 3 7 8 15 8"></polyline>
+                    </svg>
+                    Lưu cấu hình
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- JavaScript Modules -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/roi.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/monitor.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/history.js') }}?v=9"></script>
+    <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+</body>
+</html>
