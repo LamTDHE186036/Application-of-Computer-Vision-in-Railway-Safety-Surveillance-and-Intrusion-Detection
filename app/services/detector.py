@@ -48,13 +48,18 @@ def get_optimal_device():
 
 # --- NẠP MÔ HÌNH YOLO TỪ THƯ MỤC MODELS/ ---
 def load_yolo_model():
-    base_dir = config.BASE_DIR
-    model_candidates = [
-        os.path.join(base_dir, "models", "yolo26s", "model_openvino"),
-        os.path.join(base_dir, "models", "yolo26s", "model.pt"),
-        os.path.join(base_dir, "models", "yolo11s", "model_openvino"),
-        os.path.join(base_dir, "models", "yolo11s", "model.pt"),
-    ]
+    base_dirs = [config.BASE_DIR]
+    if hasattr(config, 'BUNDLE_DIR') and config.BUNDLE_DIR != config.BASE_DIR:
+        base_dirs.append(config.BUNDLE_DIR)
+
+    model_candidates = []
+    for b_dir in base_dirs:
+        model_candidates.extend([
+            os.path.join(b_dir, "models", "yolo26s", "model_openvino"),
+            os.path.join(b_dir, "models", "yolo26s", "model.pt"),
+            os.path.join(b_dir, "models", "yolo11s", "model_openvino"),
+            os.path.join(b_dir, "models", "yolo11s", "model.pt"),
+        ])
 
     selected_model_path = None
     for p in model_candidates:
@@ -546,7 +551,9 @@ def generate_frames(stream_type):
 
     reset_tracker()
 
-    tracker_cfg = config.BYTETRACK_FILE if os.path.exists(config.BYTETRACK_FILE) else "bytetrack.yaml"
+    tracker_cfg = config.BYTETRACK_FILE if os.path.exists(config.BYTETRACK_FILE) else os.path.join(getattr(config, 'BUNDLE_DIR', config.BASE_DIR), "configs", "bytetrack.yaml")
+    if not os.path.exists(tracker_cfg):
+        tracker_cfg = "bytetrack.yaml"
 
     try:
         while cap.isOpened() and config.stream_active[stream_type]:

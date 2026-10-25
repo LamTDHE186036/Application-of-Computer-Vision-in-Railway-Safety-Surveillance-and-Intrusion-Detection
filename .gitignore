@@ -1,36 +1,50 @@
-# === Python ===
+# === Python & Bytecode ===
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyd
 
-# === Dữ liệu runtime (gitignored) ===
+# === Môi trường ảo (Virtual Environments) ===
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# === PyInstaller & Đóng gói sản phẩm (Build & Dist) ===
+build/
+dist/
+*.manifest
+*.pkg
+
+# === Dữ liệu runtime & Nhật ký vi phạm (Không đẩy video/log thực tế lên Git) ===
 data/recordings/*
 !data/recordings/.gitkeep
 data/intrusion_logs/*
 !data/intrusion_logs/.gitkeep
 temp_video.mp4
+*.h264.mp4
+*.log
 
-# === File lớn (GitHub giới hạn < 100MB) ===
+# === File nén và Dữ liệu lớn (GitHub giới hạn < 100MB) ===
 Dataset.zip
 *.zip
 *.tar.gz
 *.rar
+*.7z
 
-# === Thư mục cũ (đã di chuyển sang data/) ===
+# === Thư mục đầu ra của YOLO / Thử nghiệm ===
 lichsu_video/
 lichsu_xampham/
 save_config/
-
-# === YOLO runs output ===
 runs/
 
-# === Virtual environment ===
-venv/
-.venv/
-env/
-
-# === IDE & OS ===
+# === IDE, Cấu hình cá nhân & OS ===
 .vscode/
 .idea/
+*.sublime-project
+*.sublime-workspace
 .DS_Store
 Thumbs.db
+desktop.ini

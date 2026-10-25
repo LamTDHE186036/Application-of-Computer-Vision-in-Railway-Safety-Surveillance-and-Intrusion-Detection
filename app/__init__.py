@@ -18,8 +18,15 @@ def create_app():
     """
     Application factory khởi tạo ứng dụng Flask với đường dẫn tĩnh và giao diện chuẩn
     """
-    template_dir = os.path.join(config.BASE_DIR, "templates")
-    static_dir = os.path.join(config.BASE_DIR, "static")
+    # Tìm template_dir: ưu tiên trong BUNDLE_DIR, sau đó đến BASE_DIR
+    template_dir = os.path.join(config.BUNDLE_DIR, "templates")
+    if not os.path.exists(template_dir):
+        template_dir = os.path.join(config.BASE_DIR, "templates")
+
+    # Tìm static_dir: ưu tiên trong BUNDLE_DIR, sau đó đến BASE_DIR
+    static_dir = os.path.join(config.BUNDLE_DIR, "static")
+    if not os.path.exists(static_dir):
+        static_dir = os.path.join(config.BASE_DIR, "static")
 
     app = Flask(
         __name__,
