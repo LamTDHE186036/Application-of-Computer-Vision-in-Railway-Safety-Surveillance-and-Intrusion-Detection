@@ -301,20 +301,8 @@ def process_and_draw(frame, results, fps, stream_type="webcam", current_time=Non
             track_id = str(int(box.id[0])) if box.id is not None else "?"
             label = f"{obj_name_vn} - ID: {track_id}"
 
-            # Nếu là Tàu hỏa: Tàu lưu thông hợp lệ trên ray, vẽ nhận diện rõ ràng nhưng không báo động vi phạm nguy hiểm
-            if obj_name == "train":
-                if track_id in active_objects:
-                    del active_objects[track_id]
-                if track_id in roi_dwell_tracker:
-                    del roi_dwell_tracker[track_id]
-                color = (255, 191, 0)  # Xanh Deep Sky Blue phân biệt tàu hỏa
-                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-                t_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)[0]
-                c2 = x1 + t_size[0], y1 - t_size[1] - 3
-                cv2.rectangle(frame, (x1, y1), c2, color, -1, cv2.LINE_AA)
-                cv2.putText(frame, label, (x1, y1 - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.45, [255, 255, 255], 1, cv2.LINE_AA)
-                continue
-            
+            # Dùng cùng quy tắc giao ROI cho hiển thị và cảnh báo.
+            # Chỉ lọc lớp vẽ: model.track vẫn nhận toàn bộ khung hình để giữ ID.
             intersect = False
             if has_roi:
                 y1_c, y2_c = max(0, y1), min(h, y2)
@@ -323,11 +311,24 @@ def process_and_draw(frame, results, fps, stream_type="webcam", current_time=Non
                     box_mask = roi_mask[y1_c:y2_c, x1_c:x2_c]
                     cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
                     in_polygon = cv2.pointPolygonTest(pts, (cx, cy), False) >= 0
-                    if cv2.countNonZero(box_mask) > 0 or in_polygon:
-                        intersect = True
-            else:
-                intersect = False
+                    intersect = cv2.countNonZero(box_mask) > 0 or in_polygon
 
+            # Nếu là Tàu hỏa: Tàu lưu thông hợp lệ trên ray, vẽ nhận diện rõ ràng nhưng không báo động vi phạm nguy hiểm
+            if obj_name == "train":
+                if track_id in active_objects:
+                    del active_objects[track_id]
+                if track_id in roi_dwell_tracker:
+                    del roi_dwell_tracker[track_id]
+                if not intersect:
+                    continue
+                color = (255, 191, 0)  # Xanh Deep Sky Blue phân biệt tàu hỏa
+                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                t_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)[0]
+                c2 = x1 + t_size[0], y1 - t_size[1] - 3
+                cv2.rectangle(frame, (x1, y1), c2, color, -1, cv2.LINE_AA)
+                cv2.putText(frame, label, (x1, y1 - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.45, [255, 255, 255], 1, cv2.LINE_AA)
+                continue
+            
             is_violation = False
             current_train_mode = getattr(config, 'train_mode', 'train_approaching')
 
@@ -394,13 +395,11 @@ def process_and_draw(frame, results, fps, stream_type="webcam", current_time=Non
                     label_bg = (0, 215, 255)
                     text_color = [255, 255, 255]
             else:
-                color = (210, 210, 210)  # Màu trắng xám nhạt mờ khó thấy cho vật ngoài ROI
-                thickness = 1
-                label_bg = (80, 80, 80)
-                text_color = [220, 220, 220]
                 if track_id in roi_dwell_tracker:
                     if current_time - roi_dwell_tracker[track_id]["last_seen"] > 1.5:
                         del roi_dwell_tracker[track_id]
+                # Ẩn cả box và ID bên ngoài ROI; vẫn chạy dọn sự kiện sau vòng lặp.
+                continue
                 
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness)
             t_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)[0]
