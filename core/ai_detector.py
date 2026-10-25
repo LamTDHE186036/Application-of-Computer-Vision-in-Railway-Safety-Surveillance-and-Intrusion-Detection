@@ -51,8 +51,8 @@ def get_optimal_device():
     return "cpu"
 
 # Nạp mô hình YOLO11s đã huấn luyện cho đường sắt (OpenVINO)
-MODEL_PATH = os.path.join("models", "train-railway-yolo11s_openvino_model")
-PT_FALLBACK_PATH = os.path.join("models", "train-railway-yolo11s.pt")
+MODEL_PATH = os.path.join("models", "train-railway-yolo26m_openvino_model")
+PT_FALLBACK_PATH = os.path.join("models", "train-railway-yolo26m.pt")
 
 # Biến tương thích
 OPENVINO_MODEL_PATH = MODEL_PATH
