@@ -1,5 +1,7 @@
 // ===== TOÀN CỤC HỆ THỐNG / GLOBAL STATE =====
 let currentMode = 'video';
+let currentLiveSource = 'webcam'; // 'webcam' hoặc 'droidcam'
+let currentDroidCamUrl = '192.168.0.100:4747';
 let alertEnabled = false;
 let isMonitoring = false;
 let pollInterval;
@@ -50,6 +52,9 @@ window.addEventListener('DOMContentLoaded', async () => {
             }
             if (config.train_mode) {
                 currentTrainMode = config.train_mode;
+            }
+            if (config.droidcam_url) {
+                currentDroidCamUrl = config.droidcam_url;
             }
             updateAlarmUI(false);
         }

@@ -32,6 +32,13 @@ function openSettingsModal() {
         }
     });
 
+    // Đồng bộ địa chỉ DroidCam IP
+    const droidInput = document.getElementById('modal_droidcam_input');
+    if (droidInput) {
+        let cleanVal = currentDroidCamUrl.replace(/^http:\/\//, '').replace(/\/video$/, '');
+        droidInput.value = cleanVal;
+    }
+
     modal.classList.add('active');
 }
 
@@ -79,6 +86,22 @@ async function saveSettingsFromModal() {
     const checkedBoxes = Array.from(document.querySelectorAll('.class-checkbox:checked'));
     const selectedClasses = checkedBoxes.map(cb => cb.value);
 
+    let droidcamVal = '';
+    const droidInput = document.getElementById('modal_droidcam_input');
+    if (droidInput) {
+        let rawVal = droidInput.value.trim();
+        if (rawVal) {
+            let url = rawVal;
+            if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('rtsp://')) {
+                url = 'http://' + url;
+            }
+            if (!url.endsWith('/video') && !url.endsWith('/mjpegfeed')) {
+                url = url.replace(/\/+$/, '') + '/video';
+            }
+            droidcamVal = url;
+        }
+    }
+
     if (selectedClasses.length === 0) {
         if (!confirm("Bạn chưa chọn lớp đối tượng nào! Hệ thống sẽ không phát hiện vi phạm. Bạn có chắc muốn lưu?")) {
             return;
@@ -86,14 +109,19 @@ async function saveSettingsFromModal() {
     }
 
     try {
+        const payload = {
+            conf: confVal,
+            classes: selectedClasses,
+            dwell_time: dwellVal
+        };
+        if (droidcamVal) {
+            payload.droidcam_url = droidcamVal;
+        }
+
         const res = await fetch('/set_settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                conf: confVal,
-                classes: selectedClasses,
-                dwell_time: dwellVal
-            })
+            body: JSON.stringify(payload)
         });
 
         if (res.ok) {
@@ -101,6 +129,13 @@ async function saveSettingsFromModal() {
             currentConfValue = confVal;
             currentClassesList = selectedClasses;
             currentDwellValue = dwellVal;
+            if (droidcamVal) {
+                currentDroidCamUrl = droidcamVal;
+                // Nếu đang ở màn hình DroidCam, tự động làm mới kết nối
+                if (currentMode === 'live' && currentLiveSource === 'droidcam') {
+                    setLiveSource('droidcam');
+                }
+            }
             updateAlarmUI(false);
             closeSettingsModal();
             alert("Đã lưu cấu hình AI thành công!");

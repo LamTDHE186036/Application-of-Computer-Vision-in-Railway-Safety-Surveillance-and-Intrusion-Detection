@@ -1,28 +1,35 @@
-# Byte-compiled / optimized / DLL files
+# === Python ===
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Large dataset & archives (GitHub giới hạn < 100MB, Dataset.zip nặng 626MB)
+# === Dữ liệu runtime (gitignored) ===
+data/recordings/*
+!data/recordings/.gitkeep
+data/intrusion_logs/*
+!data/intrusion_logs/.gitkeep
+temp_video.mp4
+
+# === File lớn (GitHub giới hạn < 100MB) ===
 Dataset.zip
 *.zip
 *.tar.gz
 *.rar
 
-# Video tạm & file lịch sử ghi hình
-temp_video.mp4
-lichsu_video/*
-!lichsu_video/.gitkeep
-lichsu_xampham/*
-!lichsu_xampham/.gitkeep
+# === Thư mục cũ (đã di chuyển sang data/) ===
+lichsu_video/
+lichsu_xampham/
+save_config/
+
+# === YOLO runs output ===
 runs/
 
-# Virtual environment
+# === Virtual environment ===
 venv/
 .venv/
 env/
 
-# IDEs & OS
+# === IDE & OS ===
 .vscode/
 .idea/
 .DS_Store

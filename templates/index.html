@@ -125,16 +125,16 @@
                         </svg>
                         Tải video
                     </button>
-                    <button class="mode-btn" id="btn_cam" onclick="setMode('webcam')">
+                    <button class="mode-btn" id="btn_live" onclick="setMode('live')">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
                             <circle cx="12" cy="13" r="4"></circle>
                         </svg>
-                        Webcam
+                        Cam thực tế
                     </button>
                 </div>
 
-                <!-- Chế độ Video -->
+                <!-- Chế độ 1: Video tải lên -->
                 <div id="sec_video" class="upload-section active">
                     <div class="upload-zone" id="zone_video">
                         <div class="thumb-preview-wrap">
@@ -154,11 +154,29 @@
                     </div>
                 </div>
 
-                <!-- Chế độ Webcam Guide -->
-                <div id="sec_webcam" class="upload-section">
-                    <div class="webcam-guide">
-                        <strong>Chế độ Webcam trực tiếp:</strong>
-                        <span>Hệ thống sẽ kết nối trực tiếp với camera thiết bị để nhận diện thời gian thực.</span>
+                <!-- Chế độ 2: Cam thực tế (Webcam máy tính & DroidCam điện thoại) -->
+                <div id="sec_live" class="upload-section">
+                    <div class="live-cam-box">
+                        <div class="live-sub-group">
+                            <button type="button" class="live-sub-btn active" id="sub_cam_webcam" onclick="setLiveSource('webcam')">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                                </svg>
+                                Webcam
+                            </button>
+                            <button type="button" class="live-sub-btn" id="sub_cam_droidcam" onclick="setLiveSource('droidcam')">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                                    <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                                </svg>
+                                DroidCam
+                            </button>
+                        </div>
+                        <div class="live-status-notice" id="live_notice_text">
+                            Đang kết nối camera tích hợp trên laptop/máy tính bàn...
+                        </div>
                     </div>
                 </div>
             </section>
@@ -645,6 +663,17 @@
                                 </div>
                             </div>
                         </label>
+                    </div>
+                </div>
+
+                <!-- 4. Cấu hình Camera điện thoại DroidCam -->
+                <div class="setting-section">
+                    <div class="setting-title-row">
+                        <label class="setting-title">4. Địa chỉ Camera điện thoại (DroidCam WiFi)</label>
+                    </div>
+                    <div class="setting-hint">Nhập WiFi IP và Port hiển thị trên ứng dụng DroidCam điện thoại (ví dụ: 192.168.0.100:4747):</div>
+                    <div class="modal-input-wrap">
+                        <input type="text" id="modal_droidcam_input" class="modal-text-input" placeholder="192.168.0.100:4747">
                     </div>
                 </div>
             </div>

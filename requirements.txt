@@ -1,10 +1,6 @@
-gradio>=5.0.0
-fastrtc>=0.0.30
+flask>=2.0.0
 ultralytics>=8.0.0
 opencv-python>=4.8.0
-av>=11.0.0
-gTTS>=2.5.0
-pandas
+openvino>=2024.0.0
 numpy
 torch
-

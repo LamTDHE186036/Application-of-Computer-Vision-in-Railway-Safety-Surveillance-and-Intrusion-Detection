@@ -1,7 +1,7 @@
 @echo off
-title YOLO WebRTC and Video Studio
+title Railway Safety Surveillance and Intrusion Detection System
 echo =======================================================
-echo    Khoi dong ung dung YOLO Vision WebRTC Studio
+echo    Khoi dong He thong Giam sat An toan Duong sat
 echo =======================================================
-python app.py
+python main.py
 pause

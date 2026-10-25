@@ -4,42 +4,38 @@ from ultralytics import YOLO
 import time
 import datetime
 import os
-import re 
-import threading
-import queue
-import subprocess
+import re
 from collections import deque
-from core import configs as config  
-# pyrefly: ignore[missing-import]
-import openvino as ov
 
-def convert_video_to_h264_async(video_path):
-    """Tự động chuyển đổi video đã ghi sang chuẩn H.264 (+faststart) để tương thích 100% với trình duyệt web"""
-    def _run():
-        if not os.path.exists(video_path):
-            return
-        tmp_converted = video_path + ".h264.mp4"
-        cmd = [
-            'ffmpeg', '-y', '-i', video_path,
-            '-c:v', 'libx264', '-preset', 'ultrafast',
-            '-movflags', '+faststart',
-            tmp_converted
-        ]
-        try:
-            res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            if res.returncode == 0 and os.path.exists(tmp_converted) and os.path.getsize(tmp_converted) > 1000:
-                os.replace(tmp_converted, video_path)
-            elif os.path.exists(tmp_converted):
-                os.remove(tmp_converted)
-        except Exception:
-            if os.path.exists(tmp_converted):
-                try:
-                    os.remove(tmp_converted)
-                except Exception:
-                    pass
-    threading.Thread(target=_run, daemon=True).start()
+# Cho phép Ultralytics tự động nhận diện thư mục model_openvino theo kiến trúc dự án
+try:
+    from ultralytics.nn import autobackend
+    _orig_model_type = autobackend.AutoBackend._model_type
 
-# Khởi tạo model AI với OpenVINO tăng tốc phần cứng Intel (Iris Xe GPU / CPU)
+    def _patched_model_type(p, dnn=False):
+        fmt = _orig_model_type(p, dnn)
+        if fmt is None and 'openvino' in str(p).lower():
+            return 'openvino'
+        return fmt
+
+    autobackend.AutoBackend._model_type = staticmethod(_patched_model_type)
+except Exception:
+    pass
+
+from app import config
+from app.utils.video_utils import (
+    convert_video_to_h264_async,
+    format_time_str,
+    format_file_time_str,
+    draw_roi as util_draw_roi
+)
+from app.services.tracker import (
+    reset_tracker as svc_reset_tracker,
+    check_roi_intersection,
+    update_dwell_and_evaluate_violation
+)
+
+# --- THIẾT BỊ SUY LUẬN TỐI ƯU (OPENVINO INTEL GPU / CPU) ---
 def get_optimal_device():
     try:
         import openvino as ov
@@ -50,33 +46,45 @@ def get_optimal_device():
         pass
     return "cpu"
 
-# Nạp mô hình YOLO26s-All đã huấn luyện cho đường sắt (OpenVINO)
-MODEL_PATH = os.path.join("models", "train-railway-yolo26s-all_openvino_model")
-PT_FALLBACK_PATH = os.path.join("models", "train-railway-yolo26s-all.pt")
+# --- NẠP MÔ HÌNH YOLO TỪ THƯ MỤC MODELS/ ---
+def load_yolo_model():
+    base_dir = config.BASE_DIR
+    model_candidates = [
+        os.path.join(base_dir, "models", "yolo26s", "model_openvino"),
+        os.path.join(base_dir, "models", "yolo26s", "model.pt"),
+        os.path.join(base_dir, "models", "yolo11s", "model_openvino"),
+        os.path.join(base_dir, "models", "yolo11s", "model.pt"),
+    ]
 
-# Biến tương thích
+    selected_model_path = None
+    for p in model_candidates:
+        if os.path.exists(p):
+            selected_model_path = p
+            break
+
+    if not selected_model_path:
+        raise FileNotFoundError("Không tìm thấy mô hình huấn luyện trong thư mục models/yolo26s hoặc models/yolo11s")
+
+    if "openvino" in selected_model_path.lower():
+        device = get_optimal_device()
+    else:
+        try:
+            import torch
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        except Exception:
+            device = "cpu"
+
+    model_instance = YOLO(selected_model_path)
+    print(f"[*] Đã nạp thành công mô hình: {selected_model_path} trên thiết bị {device}")
+    return model_instance, device, selected_model_path
+
+model, DEVICE, MODEL_PATH = load_yolo_model()
 OPENVINO_MODEL_PATH = MODEL_PATH
-PT_MODEL_PATH = PT_FALLBACK_PATH
+PT_MODEL_PATH = MODEL_PATH
 
-if os.path.exists(MODEL_PATH):
-    model = YOLO(MODEL_PATH)
-    DEVICE = get_optimal_device()
-    print(f"[*] Đã nạp thành công mô hình huấn luyện YOLO26s-All: {MODEL_PATH} trên thiết bị {DEVICE}")
-elif os.path.exists(PT_FALLBACK_PATH):
-    try:
-        import torch
-        DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-    except Exception:
-        DEVICE = "cpu"
-    model = YOLO(PT_FALLBACK_PATH)
-    print(f"[*] Đã nạp mô hình huấn luyện YOLO26s-All (.pt): {PT_FALLBACK_PATH} trên {DEVICE}")
-else:
-    raise FileNotFoundError(f"Không tìm thấy mô hình huấn luyện tại {MODEL_PATH}")
-
-
-# --- TẠO THƯ MỤC LƯU TRỮ NẾU CHƯA CÓ ---
-TXT_DIR = "lichsu_xampham"
-VID_DIR = "lichsu_video"
+# --- THƯ MỤC LƯU TRỮ DỮ LIỆU RUNTIME (DATA/) ---
+TXT_DIR = config.INTRUSION_LOGS_DIR
+VID_DIR = config.RECORDINGS_DIR
 os.makedirs(TXT_DIR, exist_ok=True)
 os.makedirs(VID_DIR, exist_ok=True)
 
@@ -96,9 +104,9 @@ def translate_class(eng_name):
     return CLASS_NAMES_VI.get(eng_name.lower(), eng_name)
 
 # --- THAM SỐ CẤU HÌNH TỐI ƯU HÓA HỆ THỐNG ---
-FRAME_SKIP = 2          # Hướng 3: Chạy AI mỗi 2 frame để giảm tải CPU/GPU và loại bỏ giật lag
-PRE_ROLL_SECONDS = 3.0  # Hướng 2: Lưu trước sự kiện vi phạm 3 giây (Hộp đen Ring Buffer)
-TIMEOUT_SECONDS = 3.0   # Hướng 2: Duy trì ghi thêm 3 giây sau sự kiện (Post-roll) và timeout đối tượng
+FRAME_SKIP = 2          # Chạy AI mỗi 2 frame để giảm tải CPU/GPU và loại bỏ giật lag
+PRE_ROLL_SECONDS = 3.0  # Lưu trước sự kiện vi phạm 3 giây (Hộp đen Ring Buffer)
+TIMEOUT_SECONDS = 3.0   # Duy trì ghi thêm 3 giây sau sự kiện (Post-roll) và timeout đối tượng
 MIN_CONFIRM_SECONDS = 0.5  # Lọc nhiễu: Phải ở trong ROI >= 0.5s mới xác nhận vi phạm (chống chớp 1-2 frame)
 MIN_EVENT_DURATION = 1.0   # Lọc nhiễu: Tổng thời lượng vi phạm phải >= 1.0s mới ghi lịch sử và lưu video
 
@@ -115,23 +123,6 @@ last_activity_time = 0.0
 has_valid_event_in_recording = False
 roi_dwell_tracker = {}  # {track_id: {"enter_time": float, "last_seen": float, "violating": bool}}
 pre_roll_buffer = deque(maxlen=90) # Bộ đệm xoay vòng lưu trước sự kiện
-
-# --- HÀM ĐỊNH DẠNG THỜI GIAN THEO HỆ QUY CHIẾU (HƯỚNG 1) ---
-def format_time_str(t, stream_type="webcam", base_dt=None):
-    if stream_type == "video" and base_dt is not None:
-        return (base_dt + datetime.timedelta(seconds=float(t))).strftime("%H:%M:%S")
-    try:
-        return datetime.datetime.fromtimestamp(float(t)).strftime("%H:%M:%S")
-    except Exception:
-        return datetime.datetime.now().strftime("%H:%M:%S")
-
-def format_file_time_str(t, stream_type="webcam", base_dt=None):
-    if stream_type == "video" and base_dt is not None:
-        return (base_dt + datetime.timedelta(seconds=float(t))).strftime("%Hh%Mm%Ss")
-    try:
-        return datetime.datetime.fromtimestamp(float(t)).strftime("%Hh%Mm%Ss")
-    except Exception:
-        return datetime.datetime.now().strftime("%Hh%Mm%Ss")
 
 # --- HÀM KHÔI PHỤC LỊCH SỬ HÔM NAY KHI MỞ PHẦN MỀM ---
 def load_today_events():
@@ -167,7 +158,7 @@ def update_txt_file(date_str, tid, start_time, end_time, obj_name, status, mode=
     else:
         target_str_active = f"{target_prefix} đang ở trong vùng nguy hiểm\n"
         target_str_done = f"{date_str} {start_time} - {end_time}: {class_name_vn} (ID {tid}) đã đi vào vùng nguy hiểm\n"
-    
+
     lines = []
     if os.path.exists(filename):
         with open(filename, 'r', encoding='utf-8') as f:
@@ -192,16 +183,20 @@ def update_txt_file(date_str, tid, start_time, end_time, obj_name, status, mode=
         if not found:
             lines.append(target_str_done)
 
-    with open(filename, 'w', encoding='utf-8') as f:
-        f.writelines(lines)
+    try:
+        with open(filename, 'w', encoding='utf-8') as f:
+            f.writelines(lines)
+    except Exception:
+        pass
 
 def remove_active_txt_entry(date_str, tid, start_time, obj_name):
     """Xóa bỏ dòng ghi nhận tạm thời nếu đối tượng xuất hiện quá ngắn (dưới 1 giây)"""
     class_name_vn = translate_class(obj_name)
     filename = os.path.join(TXT_DIR, f"Lich_su_{date_str}.txt")
-    target_prefix = f"{date_str} {start_time}: {class_name_vn} (ID {tid})"
     if not os.path.exists(filename):
         return
+
+    target_prefix = f"{date_str} {start_time}: {class_name_vn} (ID {tid})"
     try:
         with open(filename, 'r', encoding='utf-8') as f:
             lines = f.readlines()
@@ -224,7 +219,6 @@ def generate_html():
     for tid, data in active_objects.items():
         name_vn = translate_class(data['name'])
         if data.get('mode') == 'no_train':
-            # Tính dwell từ last_seen và enter_time để chuẩn xác theo timeline
             dwell_s = max(int(data.get('last_seen', 0) - data.get('enter_time', 0)), int(getattr(config, 'dwell_time', 5)))
             html_text += f"<div class='event-item' style='background: #fff0f0; padding: 8px; border-radius: 6px; border-left: 3px solid var(--red);'><div class='time' style='color: var(--red);'>{data['start_time_str']}</div><div class='desc'><b>{name_vn}:</b> <span style='color: var(--red);'>ở trong vùng nguy hiểm {dwell_s} giây</span></div></div>"
         else:
@@ -236,16 +230,7 @@ def generate_html():
     return html_text
 
 def draw_roi(frame):
-    if config.roi_polygon and len(config.roi_polygon) >= 3:
-        h, w = frame.shape[:2]
-        pts = np.array([[int(p['x'] * w), int(p['y'] * h)] for p in config.roi_polygon], np.int32)
-        pts = pts.reshape((-1, 1, 2))
-        
-        overlay = frame.copy()
-        cv2.fillPoly(overlay, [pts], (0, 255, 255)) 
-        cv2.addWeighted(overlay, 0.15, frame, 0.85, 0, frame)
-        cv2.polylines(frame, [pts], True, (0, 200, 255), 2)
-    return frame
+    return util_draw_roi(frame, config.roi_polygon)
 
 def process_and_draw(frame, results, fps, stream_type="webcam", current_time=None, current_dt=None, base_video_datetime=None):
     global active_objects, completed_events, current_date_str
@@ -301,17 +286,9 @@ def process_and_draw(frame, results, fps, stream_type="webcam", current_time=Non
             track_id = str(int(box.id[0])) if box.id is not None else "?"
             label = f"{obj_name_vn} - ID: {track_id}"
 
-            # Dùng cùng quy tắc giao ROI cho hiển thị và cảnh báo.
-            # Chỉ lọc lớp vẽ: model.track vẫn nhận toàn bộ khung hình để giữ ID.
             intersect = False
             if has_roi:
-                y1_c, y2_c = max(0, y1), min(h, y2)
-                x1_c, x2_c = max(0, x1), min(w, x2)
-                if y1_c < y2_c and x1_c < x2_c:
-                    box_mask = roi_mask[y1_c:y2_c, x1_c:x2_c]
-                    cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
-                    in_polygon = cv2.pointPolygonTest(pts, (cx, cy), False) >= 0
-                    intersect = cv2.countNonZero(box_mask) > 0 or in_polygon
+                intersect = check_roi_intersection((x1, y1, x2, y2), roi_mask, pts, (h, w))
 
             # Nếu là Tàu hỏa: Tàu lưu thông hợp lệ trên ray, KHÔNG vẽ bbox, KHÔNG lưu sự kiện, KHÔNG cảnh báo vi phạm
             if obj_name == "train":
@@ -327,36 +304,12 @@ def process_and_draw(frame, results, fps, stream_type="webcam", current_time=Non
             current_train_mode = getattr(config, 'train_mode', 'train_approaching')
 
             if intersect:
-                # CẬP NHẬT DWELL TRACKER CHO MỌI ĐỐI TƯỢNG VÀO ROI
-                if track_id not in roi_dwell_tracker:
-                    roi_dwell_tracker[track_id] = {
-                        "enter_time": current_time,
-                        "last_seen": current_time,
-                        "violating": False
-                    }
-                else:
-                    roi_dwell_tracker[track_id]["last_seen"] = current_time
-
-                dwell_duration = current_time - roi_dwell_tracker[track_id]["enter_time"]
-
-                if current_train_mode == 'train_approaching':
-                    # Chế độ 1: Tàu sắp tới -> Cần ở trong ROI >= MIN_CONFIRM_SECONDS (0.5s) mới xác nhận vi phạm (chống nhiễu nháy)
-                    if dwell_duration >= MIN_CONFIRM_SECONDS:
-                        is_violation = True
-                        roi_dwell_tracker[track_id]["violating"] = True
-                    else:
-                        is_violation = False
-                    label = f"{obj_name_vn} - ID: {track_id} ({dwell_duration:.1f}s)"
-                else:
-                    # Chế độ 2: Không có tàu -> Chỉ vi phạm khi ở trong ROI quá X giây
-                    dwell_limit = float(getattr(config, 'dwell_time', 5.0))
-                    if dwell_duration >= dwell_limit:
-                        is_violation = True
-                        roi_dwell_tracker[track_id]["violating"] = True
-                        label = f"{obj_name_vn} - ID: {track_id} (DUNG {dwell_duration:.0f}s)"
-                    else:
-                        is_violation = False
-                        label = f"{obj_name_vn} - ID: {track_id} ({dwell_duration:.1f}s/{dwell_limit:.0f}s)"
+                dwell_limit = float(getattr(config, 'dwell_time', 5.0))
+                is_violation, dwell_duration, label_suffix = update_dwell_and_evaluate_violation(
+                    track_id, current_time, current_train_mode, dwell_limit,
+                    roi_dwell_tracker, MIN_CONFIRM_SECONDS
+                )
+                label = f"{obj_name_vn} - ID: {track_id} {label_suffix}"
 
                 if is_violation:
                     color = (0, 0, 255)  # Màu đỏ cảnh báo vi phạm
@@ -392,7 +345,6 @@ def process_and_draw(frame, results, fps, stream_type="webcam", current_time=Non
                 if track_id in roi_dwell_tracker:
                     if current_time - roi_dwell_tracker[track_id]["last_seen"] > 1.5:
                         del roi_dwell_tracker[track_id]
-                # Ẩn cả box và ID bên ngoài ROI; vẫn chạy dọn sự kiện sau vòng lặp.
                 continue
                 
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness)
@@ -437,13 +389,12 @@ def process_and_draw(frame, results, fps, stream_type="webcam", current_time=Non
     # In ngày giờ theo timeline video / đồng hồ thực
     cv2.putText(frame, f"{date_str} {time_str}", (15, 35), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
 
-    # HƯỚNG 2: XỬ LÝ LƯU VIDEO VI PHẠM (PRE-ROLL VÀ POST-ROLL)
+    # XỬ LÝ LƯU VIDEO VI PHẠM (PRE-ROLL VÀ POST-ROLL)
     if len(active_objects) > 0:
         last_activity_time = current_time
         if not is_recording:
             is_recording = True
             has_valid_event_in_recording = False
-            # Tính thời điểm bắt đầu video bao gồm cả các frame trong pre-roll buffer
             pre_roll_len = len(pre_roll_buffer)
             pre_roll_sec = pre_roll_len / fps if fps > 0 else 0
             rec_start_t = max(0.0, current_time - pre_roll_sec)
@@ -467,7 +418,7 @@ def process_and_draw(frame, results, fps, stream_type="webcam", current_time=Non
                 video_writer.release()
                 video_writer = None
                 
-                # Nếu không có sự kiện vi phạm hợp lệ nào (chỉ là nhiễu nháy) -> Xóa video tạm, không lưu video rác
+                # Nếu không có sự kiện vi phạm hợp lệ nào (chỉ là nhiễu nháy) -> Xóa video tạm
                 if not has_valid_event_in_recording:
                     if os.path.exists(temp_video_filename):
                         try:
@@ -554,23 +505,31 @@ def cleanup_recording(stream_type="webcam", current_dt=None, base_dt=None):
                 pass
 
 def reset_tracker():
-    """Khôi phục trạng thái bộ theo dõi ByteTrack khi đổi stream hoặc lặp video"""
-    try:
-        if hasattr(model, 'predictor') and hasattr(model.predictor, 'trackers'):
-            for t in model.predictor.trackers:
-                if hasattr(t, 'reset'):
-                    t.reset()
-    except Exception:
-        pass
+    svc_reset_tracker(model)
 
 def generate_frames(stream_type):
     global pre_roll_buffer
     if stream_type == "webcam":
         cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            try:
+                cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+            except Exception:
+                pass
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    elif stream_type == "droidcam":
+        raw_url = config.load_droidcam_url_from_file()
+        url = raw_url.strip()
+        if not (url.startswith("http://") or url.startswith("https://") or url.startswith("rtsp://")):
+            url = f"http://{url}"
+        if not any(url.endswith(x) for x in ["/video", "/mjpegfeed"]):
+            url = f"{url.rstrip('/')}/video"
+        print(f"[*] Đang kết nối camera điện thoại (DroidCam): {url}")
+        cap = cv2.VideoCapture(url)
     else:
-        cap = cv2.VideoCapture("temp_video.mp4")
+        temp_path = os.path.join(config.BASE_DIR, "temp_video.mp4")
+        cap = cv2.VideoCapture(temp_path)
 
     fps = cap.get(cv2.CAP_PROP_FPS)
     if fps is None or np.isnan(fps) or fps <= 0 or fps > 120:
@@ -587,6 +546,8 @@ def generate_frames(stream_type):
 
     reset_tracker()
 
+    tracker_cfg = config.BYTETRACK_FILE if os.path.exists(config.BYTETRACK_FILE) else "bytetrack.yaml"
+
     try:
         while cap.isOpened() and config.stream_active[stream_type]:
             start_time = time.time()
@@ -602,7 +563,6 @@ def generate_frames(stream_type):
                 break
             
             frame_idx += 1
-            # HƯỚNG 1: TÍNH THỜI GIAN THEO VIDEO TIMELINE THAY VÌ ĐỒNG HỒ THỰC
             if stream_type == "video":
                 video_time_sec = frame_idx / fps
                 current_time = video_time_sec
@@ -620,12 +580,22 @@ def generate_frames(stream_type):
                     config.latest_data[stream_type] = {"text": generate_html(), "alarm": False}
                 else:
                     conf = config.current_conf[stream_type]
-                    # XỬ LÝ ĐỒNG BỘ THEO KHUNG HÌNH (HƯỚNG 1):
-                    # AI phân tích trực tiếp trên chính frame hiện tại để Bbox ôm khít chuẩn xác 100%, không bị trễ hay phình to
                     try:
-                        results = model.track(source=frame, conf=conf, imgsz=640, device=DEVICE, verbose=False, persist=True, tracker="bytetrack.yaml")
-                    except Exception:
-                        results = None
+                        results = model.track(
+                            source=frame, conf=conf, imgsz=640,
+                            device=DEVICE, verbose=False, persist=True,
+                            tracker=tracker_cfg
+                        )
+                    except Exception as e:
+                        try:
+                            results = model.track(
+                                source=frame, conf=conf, imgsz=640,
+                                device=DEVICE, verbose=False, persist=True,
+                                tracker="bytetrack.yaml"
+                            )
+                        except Exception as e2:
+                            print(f"[!] AI track error: {e2}")
+                            results = None
 
                     res_img, html_text, has_danger = process_and_draw(
                         frame, results, fps, stream_type=stream_type,

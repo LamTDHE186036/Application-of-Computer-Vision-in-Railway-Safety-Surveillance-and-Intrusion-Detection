@@ -289,7 +289,7 @@ function playHistoryEvent(idx) {
             playerBadge.className = "status-badge live";
         }
         if (metaFile) {
-            metaFile.innerText = `Tập tin: lichsu_video/${ev.date}/${ev.video_file}`;
+            metaFile.innerText = `Tập tin: data/recordings/${ev.date}/${ev.video_file}`;
         }
     } else {
         currentVideoUrl = '';
@@ -309,7 +309,7 @@ function playHistoryEvent(idx) {
         if (placeholder) {
             placeholder.style.display = 'flex';
             placeholder.querySelector('h3').innerText = "Không tìm thấy video cho sự kiện này";
-            placeholder.querySelector('p').innerText = "Sự kiện được ghi lại trong nhật ký nhưng chưa có clip tương ứng trong thư mục lichsu_video.";
+            placeholder.querySelector('p').innerText = "Sự kiện được ghi lại trong nhật ký nhưng chưa có clip tương ứng trong thư mục data/recordings.";
         }
         if (playerBadge) {
             playerBadge.innerText = "KHÔNG CÓ VIDEO";
