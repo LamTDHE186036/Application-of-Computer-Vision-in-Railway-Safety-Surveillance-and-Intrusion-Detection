@@ -1,6 +1,6 @@
 description: Ultralytics YOLO11s model trained on /kaggle/working/data_kaggle.yaml
 author: Ultralytics
-date: '2026-10-21T12:29:07.212005+07:00'
+date: '2026-10-25T20:41:13.697968+07:00'
 version: 8.4.165
 license: AGPL-3.0 License (https://ultralytics.com/license)
 docs: https://docs.ultralytics.com
@@ -20,7 +20,7 @@ args:
   data: null
   batch: 1
   fraction: 1.0
-  quantize: 16
+  quantize: null
   nms: null
   dynamic: false
 channels: 3

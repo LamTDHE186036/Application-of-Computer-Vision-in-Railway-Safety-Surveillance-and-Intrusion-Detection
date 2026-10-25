@@ -50,9 +50,9 @@ def get_optimal_device():
         pass
     return "cpu"
 
-# Nạp mô hình YOLO11s đã huấn luyện cho đường sắt (OpenVINO)
-MODEL_PATH = os.path.join("models", "train-railway-yolo26m_openvino_model")
-PT_FALLBACK_PATH = os.path.join("models", "train-railway-yolo26m.pt")
+# Nạp mô hình YOLO26s-All đã huấn luyện cho đường sắt (OpenVINO)
+MODEL_PATH = os.path.join("models", "train-railway-yolo26s-all_openvino_model")
+PT_FALLBACK_PATH = os.path.join("models", "train-railway-yolo26s-all.pt")
 
 # Biến tương thích
 OPENVINO_MODEL_PATH = MODEL_PATH
@@ -61,7 +61,7 @@ PT_MODEL_PATH = PT_FALLBACK_PATH
 if os.path.exists(MODEL_PATH):
     model = YOLO(MODEL_PATH)
     DEVICE = get_optimal_device()
-    print(f"[*] Đã nạp thành công mô hình huấn luyện YOLO11s: {MODEL_PATH} trên thiết bị {DEVICE}")
+    print(f"[*] Đã nạp thành công mô hình huấn luyện YOLO26s-All: {MODEL_PATH} trên thiết bị {DEVICE}")
 elif os.path.exists(PT_FALLBACK_PATH):
     try:
         import torch
@@ -69,7 +69,7 @@ elif os.path.exists(PT_FALLBACK_PATH):
     except Exception:
         DEVICE = "cpu"
     model = YOLO(PT_FALLBACK_PATH)
-    print(f"[*] Đã nạp mô hình huấn luyện YOLO11s (.pt): {PT_FALLBACK_PATH} trên {DEVICE}")
+    print(f"[*] Đã nạp mô hình huấn luyện YOLO26s-All (.pt): {PT_FALLBACK_PATH} trên {DEVICE}")
 else:
     raise FileNotFoundError(f"Không tìm thấy mô hình huấn luyện tại {MODEL_PATH}")
 
@@ -313,20 +313,14 @@ def process_and_draw(frame, results, fps, stream_type="webcam", current_time=Non
                     in_polygon = cv2.pointPolygonTest(pts, (cx, cy), False) >= 0
                     intersect = cv2.countNonZero(box_mask) > 0 or in_polygon
 
-            # Nếu là Tàu hỏa: Tàu lưu thông hợp lệ trên ray, vẽ nhận diện rõ ràng nhưng không báo động vi phạm nguy hiểm
+            # Nếu là Tàu hỏa: Tàu lưu thông hợp lệ trên ray, KHÔNG vẽ bbox, KHÔNG lưu sự kiện, KHÔNG cảnh báo vi phạm
             if obj_name == "train":
                 if track_id in active_objects:
+                    data = active_objects[track_id]
+                    remove_active_txt_entry(date_str, track_id, data.get("start_time_str", ""), data.get("name", "train"))
                     del active_objects[track_id]
                 if track_id in roi_dwell_tracker:
                     del roi_dwell_tracker[track_id]
-                if not intersect:
-                    continue
-                color = (255, 191, 0)  # Xanh Deep Sky Blue phân biệt tàu hỏa
-                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-                t_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)[0]
-                c2 = x1 + t_size[0], y1 - t_size[1] - 3
-                cv2.rectangle(frame, (x1, y1), c2, color, -1, cv2.LINE_AA)
-                cv2.putText(frame, label, (x1, y1 - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.45, [255, 255, 255], 1, cv2.LINE_AA)
                 continue
             
             is_violation = False
