@@ -1,6 +1,6 @@
 {
   "conf": 0.5,
   "dwell_time": 6.0,
-  "train_mode": "no_train",
+  "train_mode": "train_approaching",
   "droidcam_url": "http://192.168.0.100:4747/video"
 }

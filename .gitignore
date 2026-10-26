@@ -45,6 +45,6 @@ runs/
 .idea/
 *.sublime-project
 *.sublime-workspace
-.DS_Store
+.DS_Store 
 Thumbs.db
 desktop.ini
