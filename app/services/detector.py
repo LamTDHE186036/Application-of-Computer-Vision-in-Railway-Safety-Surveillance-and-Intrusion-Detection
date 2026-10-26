@@ -58,8 +58,6 @@ def load_yolo_model():
         model_candidates.extend([
             os.path.join(b_dir, "models", "yolo26s", "model_openvino"),
             os.path.join(b_dir, "models", "yolo26s", "model.pt"),
-            os.path.join(b_dir, "models", "yolo11s", "model_openvino"),
-            os.path.join(b_dir, "models", "yolo11s", "model.pt"),
         ])
 
     selected_model_path = None
@@ -69,7 +67,7 @@ def load_yolo_model():
             break
 
     if not selected_model_path:
-        raise FileNotFoundError("Không tìm thấy mô hình huấn luyện trong thư mục models/yolo26s hoặc models/yolo11s")
+        raise FileNotFoundError("Không tìm thấy mô hình huấn luyện trong thư mục models/yolo26s")
 
     if "openvino" in selected_model_path.lower():
         device = get_optimal_device()

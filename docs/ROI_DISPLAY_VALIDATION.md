@@ -2,7 +2,7 @@
 
 Đã chạy web Flask trên nhánh `feature/roi-only-box-display` với video thật
 `03-foreign-day.mp4` (Glendale, camera cố định, 1920×1080, 30 FPS, 10 giây).
-Model: `train-railway-yolo11s_openvino_model`, OpenVINO CPU, ảnh suy luận 640.
+Model: `train-railway-yolo26s_openvino_model`, OpenVINO CPU, ảnh suy luận 640.
 Thử nghiệm dùng confidence 0.50; đây là cấu hình thử, không thay cấu hình lưu trong repo.
 
 ## Thao tác và kết quả
