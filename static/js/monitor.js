@@ -81,15 +81,29 @@ function setMode(mode) {
             setTimeout(() => fetch('/delete_video', { method: 'POST' }), 500);
         }).catch(() => {});
 
-        setLiveSource(currentLiveSource || 'webcam');
+        if (mediaTitle) mediaTitle.innerText = "Camera trực tiếp (OBS Virtual Camera)";
+        if (statusBadge) {
+            statusBadge.innerText = "OBS CAMERA SẴN SÀNG";
+            statusBadge.className = "status-badge live";
+        }
+
+        const mainImg = document.getElementById('main_preview');
+        mainImg.src = "";
+        hideMediaPlaceholder(false);
+        clearDisplayRoiCanvas();
+
+        startStream('obs', 0);
+        if (typeof refreshObsCameraInfo === 'function') {
+            refreshObsCameraInfo();
+        }
     } else if (mode === 'video') {
         if (mediaTitle) mediaTitle.innerText = "Video giám sát AI";
         if (statusBadge) {
             statusBadge.innerText = "VIDEO SẴN SÀNG";
             statusBadge.className = "status-badge";
         }
+        fetch('/stop_stream/obs').catch(() => {});
         fetch('/stop_stream/webcam').catch(() => {});
-        fetch('/stop_stream/droidcam').catch(() => {});
 
         const mainImg = document.getElementById('main_preview');
         if (!mainImg.src || mainImg.src === window.location.href) {
@@ -99,48 +113,6 @@ function setMode(mode) {
             hideMediaPlaceholder(true);
             setTimeout(drawSavedRoiOnDisplay, 100);
         }
-    }
-}
-
-function setLiveSource(source) {
-    if (isMonitoring) stopMonitor();
-    currentLiveSource = source;
-
-    const subWebcam = document.getElementById('sub_cam_webcam');
-    const subDroid = document.getElementById('sub_cam_droidcam');
-    if (subWebcam) subWebcam.classList.toggle('active', source === 'webcam');
-    if (subDroid) subDroid.classList.toggle('active', source === 'droidcam');
-
-    const mediaTitle = document.getElementById('media_title_text');
-    const statusBadge = document.getElementById('media_status_badge');
-    const notice = document.getElementById('live_notice_text');
-
-    const mainImg = document.getElementById('main_preview');
-    mainImg.src = "";
-    hideMediaPlaceholder(false);
-    clearDisplayRoiCanvas();
-
-    if (source === 'webcam') {
-        if (mediaTitle) mediaTitle.innerText = "Camera trực tiếp (Webcam máy tính)";
-        if (statusBadge) {
-            statusBadge.innerText = "WEBCAM SẴN SÀNG";
-            statusBadge.className = "status-badge live";
-        }
-        if (notice) notice.innerText = "Đang kết nối camera tích hợp trên laptop / máy tính bàn...";
-
-        fetch('/stop_stream/droidcam').catch(() => {});
-        startStream('webcam', 0);
-    } else if (source === 'droidcam') {
-        let cleanIp = (currentDroidCamUrl || '').replace(/^http:\/\//, '').replace(/\/video$/, '');
-        if (mediaTitle) mediaTitle.innerText = "Camera điện thoại (DroidCam WiFi)";
-        if (statusBadge) {
-            statusBadge.innerText = "DROIDCAM SẴN SÀNG";
-            statusBadge.className = "status-badge live";
-        }
-        if (notice) notice.innerText = `Đang tự động kết nối camera điện thoại qua WiFi DroidCam (${cleanIp || 'IP cấu hình'})...`;
-
-        fetch('/stop_stream/webcam').catch(() => {});
-        startStream('droidcam', 0);
     }
 }
 
@@ -256,8 +228,7 @@ async function startMonitor() {
     } else if (currentMode === 'live') {
         isMonitoring = true;
         updateMonitorButtonUI();
-        const activeSource = currentLiveSource || 'webcam';
-        fetch(`/set_ai/${activeSource}?ai=1`).catch(() => {});
+        fetch('/set_ai/obs?ai=1').catch(() => {});
     }
 }
 
@@ -298,7 +269,7 @@ function stopMonitor() {
     isMonitoring = false;
     updateMonitorButtonUI();
 
-    const streamType = currentMode === 'live' ? (currentLiveSource || 'webcam') : 'video';
+    const streamType = currentMode === 'live' ? 'obs' : 'video';
     // Không dừng luồng video (không gọi stop_stream) để hình ảnh vẫn chạy liên tục; chỉ tắt AI
     fetch(`/set_ai/${streamType}?ai=0`).catch(() => {});
 
@@ -306,11 +277,7 @@ function stopMonitor() {
 
     const badge = document.getElementById('media_status_badge');
     if (badge) {
-        if (currentMode === 'video') {
-            badge.innerText = "VIDEO SẴN SÀNG";
-        } else {
-            badge.innerText = (currentLiveSource === 'droidcam') ? "DROIDCAM SẴN SÀNG" : "WEBCAM SẴN SÀNG";
-        }
+        badge.innerText = currentMode === 'video' ? "VIDEO SẴN SÀNG" : "OBS CAMERA SẴN SÀNG";
         badge.className = "status-badge";
     }
 
@@ -351,11 +318,7 @@ function updateMonitorButtonUI() {
         txt.innerText = "Bắt đầu giám sát";
         icon.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
         if (badge) {
-            if (currentMode === 'video') {
-                badge.innerText = "VIDEO SẴN SÀNG";
-            } else {
-                badge.innerText = (currentLiveSource === 'droidcam') ? "DROIDCAM SẴN SÀNG" : "WEBCAM SẴN SÀNG";
-            }
+            badge.innerText = currentMode === 'video' ? "VIDEO SẴN SÀNG" : "OBS CAMERA SẴN SÀNG";
             badge.className = "status-badge";
         }
     }

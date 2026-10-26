@@ -87,7 +87,7 @@ function clearROI() {
 
     const badge = document.getElementById('media_status_badge');
     if (badge) {
-        badge.innerText = isMonitoring ? "ĐANG GIÁM SÁT AI" : (currentMode === 'webcam' ? "WEBCAM SẴN SÀNG" : (currentMode === 'droidcam' ? "DROIDCAM SẴN SÀNG" : "VIDEO SẴN SÀNG"));
+        badge.innerText = isMonitoring ? "ĐANG GIÁM SÁT AI" : (currentMode === 'live' ? "OBS CAMERA SẴN SÀNG" : "VIDEO SẴN SÀNG");
         badge.className = isMonitoring ? "status-badge live" : "status-badge";
     }
 
@@ -190,7 +190,7 @@ function saveROI() {
 
     const badge = document.getElementById('media_status_badge');
     if (badge) {
-        badge.innerText = isMonitoring ? "ĐANG GIÁM SÁT AI" : (currentMode === 'webcam' ? "WEBCAM SẴN SÀNG" : (currentMode === 'droidcam' ? "DROIDCAM SẴN SÀNG" : "VIDEO SẴN SÀNG"));
+        badge.innerText = isMonitoring ? "ĐANG GIÁM SÁT AI" : (currentMode === 'live' ? "OBS CAMERA SẴN SÀNG" : "VIDEO SẴN SÀNG");
         badge.className = isMonitoring ? "status-badge live" : "status-badge";
     }
 

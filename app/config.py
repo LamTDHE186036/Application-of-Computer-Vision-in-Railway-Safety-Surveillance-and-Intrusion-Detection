@@ -123,16 +123,23 @@ def load_train_mode_from_file():
 def save_train_mode_to_file(mode):
     _save_detection_json({"train_mode": mode})
 
-DEFAULT_DROIDCAM_URL = "http://192.168.1.15:4747/video"
+DEFAULT_OBS_CAM = "auto"
 
-def load_droidcam_url_from_file():
+def load_obs_cam_from_file():
     det_data = _load_detection_json()
-    if "droidcam_url" in det_data and det_data["droidcam_url"]:
-        return str(det_data["droidcam_url"]).strip()
-    return DEFAULT_DROIDCAM_URL
+    if "obs_cam" in det_data and det_data["obs_cam"] is not None:
+        return str(det_data["obs_cam"]).strip()
+    return DEFAULT_OBS_CAM
+
+def save_obs_cam_to_file(cam):
+    _save_detection_json({"obs_cam": str(cam).strip()})
+
+# Giữ tương thích ngược tạm thời nếu có lời gọi cũ
+def load_droidcam_url_from_file():
+    return ""
 
 def save_droidcam_url_to_file(url):
-    _save_detection_json({"droidcam_url": str(url).strip()})
+    pass
 
 # --- KHỞI TẠO BIẾN TOÀN CỤC (GLOBAL STATE) ---
 roi_polygon = load_roi_from_file()
@@ -140,18 +147,18 @@ initial_conf = load_conf_from_file()
 selected_classes = load_classes_from_file()
 dwell_time = load_dwell_from_file()
 train_mode = load_train_mode_from_file()
-droidcam_url = load_droidcam_url_from_file()
+obs_cam = load_obs_cam_from_file()
 
 latest_data = {
+    "obs": {"text": "", "alarm": False},
     "webcam": {"text": "", "alarm": False},
-    "video": {"text": "", "alarm": False},
-    "droidcam": {"text": "", "alarm": False}
+    "video": {"text": "", "alarm": False}
 }
-stream_active = {"webcam": False, "video": False, "droidcam": False}
-ai_active = {"webcam": False, "video": False, "droidcam": False} 
+stream_active = {"obs": False, "webcam": False, "video": False}
+ai_active = {"obs": False, "webcam": False, "video": False} 
 current_conf = {
+    "obs": initial_conf,
     "webcam": initial_conf,
-    "video": initial_conf,
-    "droidcam": initial_conf
+    "video": initial_conf
 }
 

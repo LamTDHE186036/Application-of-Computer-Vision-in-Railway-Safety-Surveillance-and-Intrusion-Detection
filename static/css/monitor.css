@@ -239,68 +239,78 @@
     color: var(--text-main);
 }
 
-/* Live Cam Box (Webcam & DroidCam) */
-.live-cam-box {
+/* OBS Virtual Camera Box */
+.obs-card-box {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 9px;
     background: #f8fafc;
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     padding: 12px;
 }
 
-.live-sub-group {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-    background: #e2e8f0;
-    padding: 3px;
-    border-radius: var(--radius-sm);
-}
-
-.live-sub-btn {
+.obs-header-row {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.obs-badge {
+    display: inline-flex;
+    align-items: center;
     gap: 6px;
-    padding: 7px 10px;
-    font-size: 11.5px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.obs-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+    animation: obsPulse 2s infinite;
+}
+
+@keyframes obsPulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.obs-device-tag {
+    font-size: 11px;
     font-weight: 600;
-    color: var(--text-secondary);
-    background: transparent;
-    border: none;
-    border-radius: calc(var(--radius-sm) - 2px);
-    cursor: pointer;
-    transition: all 0.2s;
-    white-space: nowrap;
-}
-
-.live-sub-btn svg {
-    flex-shrink: 0;
-}
-
-.live-sub-btn:hover {
-    color: var(--text-main);
-}
-
-.live-sub-btn.active {
-    background: #fff;
     color: var(--primary);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 12px;
+    padding: 2px 8px;
 }
 
-.live-status-notice {
+.obs-body-info {
     font-size: 11.5px;
     color: var(--text-secondary);
-    background: #fff;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 8px 10px;
+    line-height: 1.45;
+}
+
+.obs-body-info p {
+    margin: 0 0 6px 0;
+}
+
+.obs-step-hint {
     display: flex;
     align-items: center;
     gap: 6px;
-    line-height: 1.4;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: var(--radius-sm);
+    padding: 6px 8px;
+    color: #0f766e;
+    font-size: 11px;
 }
 
 /* ===== ALARM CARD ===== */

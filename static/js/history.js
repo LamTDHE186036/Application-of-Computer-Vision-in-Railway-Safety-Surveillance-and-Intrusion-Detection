@@ -53,7 +53,7 @@ function updateHistoryLiveStatus() {
 
     if (isMonitoring) {
         badge.className = 'live-bg-badge';
-        text.innerText = currentMode === 'webcam' ? 'Camera đang giám sát nền (Webcam)' : 'Video đang giám sát nền (AI)';
+        text.innerText = currentMode === 'live' ? 'Camera đang giám sát nền (OBS)' : 'Video đang giám sát nền (AI)';
     } else {
         badge.className = 'live-bg-badge idle';
         text.innerText = 'Camera đang tạm dừng (Chờ bắt đầu)';

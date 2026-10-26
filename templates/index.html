@@ -127,10 +127,10 @@
                     </button>
                     <button class="mode-btn" id="btn_live" onclick="setMode('live')">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                            <circle cx="12" cy="13" r="4"></circle>
+                            <circle cx="12" cy="12" r="2"></circle>
+                            <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path>
                         </svg>
-                        Cam thực tế
+                        OBS Camera
                     </button>
                 </div>
 
@@ -154,28 +154,26 @@
                     </div>
                 </div>
 
-                <!-- Chế độ 2: Cam thực tế (Webcam máy tính & DroidCam điện thoại) -->
+                <!-- Chế độ 2: Camera ảo OBS Virtual Camera -->
                 <div id="sec_live" class="upload-section">
-                    <div class="live-cam-box">
-                        <div class="live-sub-group">
-                            <button type="button" class="live-sub-btn active" id="sub_cam_webcam" onclick="setLiveSource('webcam')">
-                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
-                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                                    <line x1="8" y1="21" x2="16" y2="21"></line>
-                                    <line x1="12" y1="17" x2="12" y2="21"></line>
-                                </svg>
-                                Webcam
-                            </button>
-                            <button type="button" class="live-sub-btn" id="sub_cam_droidcam" onclick="setLiveSource('droidcam')">
-                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
-                                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-                                    <line x1="12" y1="18" x2="12.01" y2="18"></line>
-                                </svg>
-                                DroidCam
-                            </button>
+                    <div class="obs-card-box">
+                        <div class="obs-header-row">
+                            <div class="obs-badge">
+                                <span class="obs-dot"></span>
+                                OBS Virtual Camera
+                            </div>
+                            <span class="obs-device-tag" id="obs_device_tag">Tự động nhận diện</span>
                         </div>
-                        <div class="live-status-notice" id="live_notice_text">
-                            Đang kết nối camera tích hợp trên laptop/máy tính bàn...
+                        <div class="obs-body-info">
+                            <p>Tự động thu nhận luồng phát trực tiếp từ phần mềm <strong>OBS Studio</strong>.</p>
+                            <div class="obs-step-hint">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                </svg>
+                                <span>Mở OBS Studio & bật <strong>Start Virtual Camera</strong></span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -298,7 +296,7 @@
                                 </svg>
                             </div>
                             <h3>Chưa có nguồn giám sát</h3>
-                            <p>Tải video lên từ cột trái hoặc chuyển sang chế độ Webcam để bắt đầu.</p>
+                            <p>Tải video lên từ cột trái hoặc chuyển sang chế độ OBS Camera để bắt đầu.</p>
                             <span>Hình ảnh phát hiện xâm nhập sẽ hiển thị trực tiếp tại đây.</span>
                         </div>
 
@@ -639,14 +637,17 @@
                     </div>
                 </div>
 
-                <!-- 4. Cấu hình Camera điện thoại DroidCam -->
+                <!-- 4. Cấu hình Nguồn OBS Virtual Camera -->
                 <div class="setting-section">
                     <div class="setting-title-row">
-                        <label class="setting-title">4. Địa chỉ Camera điện thoại (DroidCam WiFi)</label>
+                        <label class="setting-title">4. Nguồn OBS Virtual Camera</label>
+                        <span class="setting-badge" id="modal_obs_detected_badge">Đang quét...</span>
                     </div>
-                    <div class="setting-hint">Nhập WiFi IP và Port hiển thị trên ứng dụng DroidCam điện thoại (ví dụ: 192.168.0.100:4747):</div>
+                    <div class="setting-hint">Hệ thống mặc định tự động tìm OBS Virtual Camera. Bạn cũng có thể chỉ định cổng Camera cụ thể:</div>
                     <div class="modal-input-wrap">
-                        <input type="text" id="modal_droidcam_input" class="modal-text-input" placeholder="192.168.0.100:4747">
+                        <select id="modal_obs_cam_select" class="modal-text-input" style="cursor: pointer;">
+                            <option value="auto">Tự động nhận diện OBS Virtual Camera (Khuyên dùng)</option>
+                        </select>
                     </div>
                 </div>
             </div>

@@ -1,7 +1,6 @@
 // ===== TOÀN CỤC HỆ THỐNG / GLOBAL STATE =====
 let currentMode = 'video';
-let currentLiveSource = 'webcam'; // 'webcam' hoặc 'droidcam'
-let currentDroidCamUrl = '192.168.0.100:4747';
+let currentObsCam = 'auto';
 let alertEnabled = false;
 let isMonitoring = false;
 let pollInterval;
@@ -22,6 +21,29 @@ function updateClock() {
     const topbarDate = document.getElementById('topbar_date');
     if (topbarTime) topbarTime.innerText = timeStr;
     if (topbarDate) topbarDate.innerText = dateStr;
+}
+
+async function refreshObsCameraInfo() {
+    try {
+        const res = await fetch('/get_cameras');
+        if (res.ok) {
+            const data = await res.json();
+            const tag = document.getElementById('obs_device_tag');
+            if (tag) {
+                const obsCam = data.cameras.find(c => c.is_obs);
+                if (obsCam) {
+                    tag.innerText = `${obsCam.name} (Port ${obsCam.index})`;
+                    tag.style.background = '#ecfdf5';
+                    tag.style.color = '#059669';
+                    tag.style.borderColor = '#a7f3d0';
+                } else {
+                    tag.innerText = `Port ${data.active_index} (Tự động)`;
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("Lỗi refreshObsCameraInfo:", e);
+    }
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
@@ -53,14 +75,15 @@ window.addEventListener('DOMContentLoaded', async () => {
             if (config.train_mode) {
                 currentTrainMode = config.train_mode;
             }
-            if (config.droidcam_url) {
-                currentDroidCamUrl = config.droidcam_url;
+            if (config.obs_cam !== undefined) {
+                currentObsCam = config.obs_cam;
             }
             updateAlarmUI(false);
         }
     } catch (err) {
         console.warn("Không kết nối được /get_config:", err);
     }
+    refreshObsCameraInfo();
     updateRoiStatusNotice();
 
     try {

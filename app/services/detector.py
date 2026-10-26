@@ -504,115 +504,21 @@ def cleanup_recording(stream_type="webcam", current_dt=None, base_dt=None):
             except Exception:
                 pass
 
-class DroidCamStream:
-    """
-    Tiến trình đọc ngầm chuyên dụng cho DroidCam qua mạng (IP/HTTP/MJPEG).
-    Cơ chế Zero-Buffer: Đọc liên tục khung hình từ socket mạng để giải phóng hàng đợi mạng,
-    và luôn lưu trữ duy nhất 1 khung hình mới nhất. Khi AI hoặc luồng chính cần, nó sẽ lấy
-    ngay khung hình thời gian thực, triệt tiêu độ trễ tích lũy và hiện tượng nhảy cóc.
-    """
-    def __init__(self, url):
-        self.url = url
-        self.cap = cv2.VideoCapture(url)
-        try:
-            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        except Exception:
-            pass
-
-        self.ret = False
-        self.frame = None
-        self.stopped = False
-        self.lock = threading.Lock()
-        self.new_frame_event = threading.Event()
-
-        # Đợi kết nối ban đầu và đọc thử khung hình đầu tiên (tối đa 3 giây)
-        start_t = time.time()
-        while time.time() - start_t < 3.0:
-            if self.cap.isOpened():
-                r, f = self.cap.read()
-                if r and f is not None:
-                    self.ret = True
-                    self.frame = f
-                    break
-            time.sleep(0.05)
-
-        # Khởi động thread chạy ngầm
-        self.thread = threading.Thread(target=self._reader, daemon=True)
-        self.thread.start()
-
-    def _reader(self):
-        while not self.stopped:
-            if not self.cap.isOpened():
-                time.sleep(0.02)
-                continue
-            r, f = self.cap.read()
-            if not r or f is None:
-                time.sleep(0.005)
-                continue
-            with self.lock:
-                self.ret = True
-                self.frame = f
-            self.new_frame_event.set()
-
-    def read(self):
-        # Đợi sự kiện frame mới tối đa 0.1s nếu chưa dừng
-        if not self.stopped:
-            self.new_frame_event.wait(timeout=0.1)
-            self.new_frame_event.clear()
-
-        with self.lock:
-            if self.frame is not None:
-                return self.ret, self.frame.copy()
-            return self.ret, None
-
-    def isOpened(self):
-        return self.cap.isOpened() and not self.stopped
-
-    def get(self, prop_id):
-        return self.cap.get(prop_id)
-
-    def set(self, prop_id, value):
-        return self.cap.set(prop_id, value)
-
-    def release(self):
-        self.stopped = True
-        self.new_frame_event.set()
-        try:
-            if hasattr(self, 'thread') and self.thread.is_alive():
-                self.thread.join(timeout=0.5)
-        except Exception:
-            pass
-        try:
-            if self.cap and self.cap.isOpened():
-                self.cap.release()
-        except Exception:
-            pass
 
 def reset_tracker():
     svc_reset_tracker(model)
 
 def generate_frames(stream_type):
     global pre_roll_buffer
-    if stream_type == "webcam":
-        cap = cv2.VideoCapture(0)
+    if stream_type in ("obs", "webcam"):
+        from app.utils.camera_utils import find_obs_camera_index
+        obs_idx = find_obs_camera_index(config.load_obs_cam_from_file())
+        print(f"[*] Đang mở camera OBS Virtual Camera (Index {obs_idx})...")
+        cap = cv2.VideoCapture(obs_idx, cv2.CAP_DSHOW)
         if not cap.isOpened():
-            try:
-                cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-            except Exception:
-                pass
+            cap = cv2.VideoCapture(obs_idx)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-    elif stream_type == "droidcam":
-        raw_url = config.load_droidcam_url_from_file()
-        url = raw_url.strip()
-        if not (url.startswith("http://") or url.startswith("https://")):
-            url = f"http://{url}"
-        if not any(url.endswith(x) for x in ["/video", "/mjpegfeed"]):
-            url = f"{url.rstrip('/')}/video"
-        print(f"[*] Đang kết nối camera điện thoại (DroidCam): {url}")
-        cap = DroidCamStream(url)
-        if not cap.isOpened():
-            print(f"[!] Không thể kết nối DroidCam tại {url}. Vui lòng kiểm tra IP và đảm bảo app DroidCam trên điện thoại đang mở.")
     else:
         temp_path = os.path.join(config.BASE_DIR, "temp_video.mp4")
         cap = cv2.VideoCapture(temp_path)
@@ -636,7 +542,7 @@ def generate_frames(stream_type):
     if not os.path.exists(tracker_cfg):
         tracker_cfg = "bytetrack.yaml"
 
-    droid_retry = 0
+    camera_retry = 0
     try:
         while cap.isOpened() and config.stream_active[stream_type]:
             start_time = time.time()
@@ -649,13 +555,13 @@ def generate_frames(stream_type):
                     frame_idx = 0
                     base_video_datetime = datetime.datetime.now()
                     continue
-                elif stream_type == "droidcam":
-                    droid_retry += 1
-                    if droid_retry < 60 and config.stream_active[stream_type]:
+                else:
+                    camera_retry += 1
+                    if camera_retry < 60 and config.stream_active[stream_type]:
                         time.sleep(0.05)
                         continue
                 break
-            droid_retry = 0
+            camera_retry = 0
             
             frame_idx += 1
             if stream_type == "video":
@@ -710,9 +616,8 @@ def generate_frames(stream_type):
                 yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
             elapsed = time.time() - start_time
-            if stream_type != "droidcam":
-                if elapsed < delay:
-                    time.sleep(delay - elapsed)
+            if elapsed < delay:
+                time.sleep(delay - elapsed)
 
     finally:
         cap.release()

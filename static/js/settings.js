@@ -32,11 +32,42 @@ function openSettingsModal() {
         }
     });
 
-    // Đồng bộ địa chỉ DroidCam IP
-    const droidInput = document.getElementById('modal_droidcam_input');
-    if (droidInput) {
-        let cleanVal = currentDroidCamUrl.replace(/^http:\/\//, '').replace(/\/video$/, '');
-        droidInput.value = cleanVal;
+    // Đồng bộ danh sách Camera cho OBS
+    const camSelect = document.getElementById('modal_obs_cam_select');
+    const detectedBadge = document.getElementById('modal_obs_detected_badge');
+    if (camSelect) {
+        fetch('/get_cameras').then(r => r.json()).then(data => {
+            camSelect.innerHTML = '';
+            
+            const optAuto = document.createElement('option');
+            optAuto.value = 'auto';
+            optAuto.text = 'Tự động nhận diện OBS Virtual Camera (Khuyên dùng)';
+            camSelect.appendChild(optAuto);
+
+            let hasObs = false;
+            if (data && data.cameras && Array.isArray(data.cameras)) {
+                data.cameras.forEach(cam => {
+                    const opt = document.createElement('option');
+                    opt.value = String(cam.index);
+                    opt.text = `[Cổng ${cam.index}] ${cam.name}${cam.is_obs ? ' ⭐ (Đã nhận diện OBS)' : ''}`;
+                    if (cam.is_obs) hasObs = true;
+                    camSelect.appendChild(opt);
+                });
+            }
+
+            camSelect.value = String(currentObsCam || 'auto');
+            if (detectedBadge) {
+                if (hasObs) {
+                    detectedBadge.innerText = "Đã kết nối OBS";
+                    detectedBadge.style.background = "#ecfdf5";
+                    detectedBadge.style.color = "#059669";
+                } else {
+                    detectedBadge.innerText = "Chờ bật Virtual Cam";
+                    detectedBadge.style.background = "#fffbeb";
+                    detectedBadge.style.color = "#d97706";
+                }
+            }
+        }).catch(e => console.warn("Lỗi tải camera:", e));
     }
 
     modal.classList.add('active');
@@ -86,21 +117,8 @@ async function saveSettingsFromModal() {
     const checkedBoxes = Array.from(document.querySelectorAll('.class-checkbox:checked'));
     const selectedClasses = checkedBoxes.map(cb => cb.value);
 
-    let droidcamVal = '';
-    const droidInput = document.getElementById('modal_droidcam_input');
-    if (droidInput) {
-        let rawVal = droidInput.value.trim();
-        if (rawVal) {
-            let url = rawVal;
-            if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('rtsp://')) {
-                url = 'http://' + url;
-            }
-            if (!url.endsWith('/video') && !url.endsWith('/mjpegfeed')) {
-                url = url.replace(/\/+$/, '') + '/video';
-            }
-            droidcamVal = url;
-        }
-    }
+    const camSelect = document.getElementById('modal_obs_cam_select');
+    const obsCamVal = camSelect ? camSelect.value : 'auto';
 
     if (selectedClasses.length === 0) {
         if (!confirm("Bạn chưa chọn lớp đối tượng nào! Hệ thống sẽ không phát hiện vi phạm. Bạn có chắc muốn lưu?")) {
@@ -112,11 +130,9 @@ async function saveSettingsFromModal() {
         const payload = {
             conf: confVal,
             classes: selectedClasses,
-            dwell_time: dwellVal
+            dwell_time: dwellVal,
+            obs_cam: obsCamVal
         };
-        if (droidcamVal) {
-            payload.droidcam_url = droidcamVal;
-        }
 
         const res = await fetch('/set_settings', {
             method: 'POST',
@@ -129,13 +145,17 @@ async function saveSettingsFromModal() {
             currentConfValue = confVal;
             currentClassesList = selectedClasses;
             currentDwellValue = dwellVal;
-            if (droidcamVal) {
-                currentDroidCamUrl = droidcamVal;
-                // Nếu đang ở màn hình DroidCam, tự động làm mới kết nối
-                if (currentMode === 'live' && currentLiveSource === 'droidcam') {
-                    setLiveSource('droidcam');
-                }
+            currentObsCam = obsCamVal;
+            
+            if (typeof refreshObsCameraInfo === 'function') {
+                refreshObsCameraInfo();
             }
+
+            // Nếu đang xem trực tiếp camera OBS, làm mới luồng stream
+            if (currentMode === 'live') {
+                startStream('obs', isMonitoring ? 1 : 0);
+            }
+
             updateAlarmUI(false);
             closeSettingsModal();
             alert("Đã lưu cấu hình AI thành công!");
