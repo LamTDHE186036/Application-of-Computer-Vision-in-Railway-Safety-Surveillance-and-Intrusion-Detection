@@ -5,8 +5,10 @@ import time
 import datetime
 import os
 import re
-from collections import deque
 import threading
+from collections import deque
+import openvino as ov
+
 
 # Cho phép Ultralytics tự động nhận diện thư mục model_openvino theo kiến trúc dự án
 try:
@@ -39,7 +41,6 @@ from app.services.tracker import (
 # --- THIẾT BỊ SUY LUẬN TỐI ƯU (OPENVINO INTEL GPU / CPU) ---
 def get_optimal_device():
     try:
-        import openvino as ov
         core = ov.Core()
         if "GPU" in core.available_devices:
             return "intel:gpu"
@@ -83,8 +84,6 @@ def load_yolo_model():
     return model_instance, device, selected_model_path
 
 model, DEVICE, MODEL_PATH = load_yolo_model()
-OPENVINO_MODEL_PATH = MODEL_PATH
-PT_MODEL_PATH = MODEL_PATH
 
 # --- THƯ MỤC LƯU TRỮ DỮ LIỆU RUNTIME (DATA/) ---
 TXT_DIR = config.INTRUSION_LOGS_DIR
@@ -96,10 +95,7 @@ os.makedirs(VID_DIR, exist_ok=True)
 CLASS_NAMES_VI = {
     "person": "Người",
     "motorcycle": "Xe máy",
-    "bicycle": "Xe đạp",
     "car": "Ô tô",
-    "truck": "Xe tải",
-    "bus": "Xe buýt",
     "truck-bus": "Xe tải/Xe buýt",
     "train": "Tàu hỏa"
 }
@@ -609,7 +605,7 @@ def generate_frames(stream_type):
     elif stream_type == "droidcam":
         raw_url = config.load_droidcam_url_from_file()
         url = raw_url.strip()
-        if not (url.startswith("http://") or url.startswith("https://") or url.startswith("rtsp://")):
+        if not (url.startswith("http://") or url.startswith("https://")):
             url = f"http://{url}"
         if not any(url.endswith(x) for x in ["/video", "/mjpegfeed"]):
             url = f"{url.rstrip('/')}/video"

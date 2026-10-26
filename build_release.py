@@ -22,14 +22,22 @@ def build():
 
     print("\n[*] PyInstaller hoan tat! Tien hanh chuan bi thu muc phan phoi...")
 
-    # 2. Sao chep models/ sang dist/RailwaySafety/models/
+    # 2. Sao chep duy nhat mo hinh AI can thiet (yolo26s) sang dist/RailwaySafety/models/
     src_models = os.path.join(base_dir, "models")
     dst_models = os.path.join(target_dir, "models")
-    if os.path.exists(src_models):
-        print(f"[*] Dang sao chep mo hinh AI sang: {dst_models}")
-        if os.path.exists(dst_models):
-            shutil.rmtree(dst_models)
-        shutil.copytree(src_models, dst_models)
+    os.makedirs(dst_models, exist_ok=True)
+
+    src_yolo26s = os.path.join(src_models, "yolo26s")
+    dst_yolo26s = os.path.join(dst_models, "yolo26s")
+    if os.path.exists(src_yolo26s):
+        print(f"[*] Dang sao chep mo hinh AI can thiet sang: {dst_yolo26s}")
+        if os.path.exists(dst_yolo26s):
+            shutil.rmtree(dst_yolo26s)
+        shutil.copytree(
+            src_yolo26s,
+            dst_yolo26s,
+            ignore=shutil.ignore_patterns("*.py", "*.pyc", "__pycache__", ".git*")
+        )
 
     # 3. Sao chep configs/ sang dist/RailwaySafety/configs/
     src_configs = os.path.join(base_dir, "configs")
@@ -37,13 +45,18 @@ def build():
     if os.path.exists(src_configs):
         print(f"[*] Dang sao chep cau hinh configs sang: {dst_configs}")
         if not os.path.exists(dst_configs):
-            shutil.copytree(src_configs, dst_configs)
+            shutil.copytree(
+                src_configs,
+                dst_configs,
+                ignore=shutil.ignore_patterns("*.py", "*.pyc", "__pycache__", ".git*")
+            )
         else:
             for item in os.listdir(src_configs):
-                s = os.path.join(src_configs, item)
-                d = os.path.join(dst_configs, item)
-                if not os.path.exists(d) and os.path.isfile(s):
-                    shutil.copy2(s, d)
+                if item.endswith(('.json', '.yaml', '.yml')):
+                    s = os.path.join(src_configs, item)
+                    d = os.path.join(dst_configs, item)
+                    if not os.path.exists(d) and os.path.isfile(s):
+                        shutil.copy2(s, d)
 
     # 4. Tao cau truc thu muc data/ ngang hang voi RailwaySafety.exe
     dst_data = os.path.join(target_dir, "data")
