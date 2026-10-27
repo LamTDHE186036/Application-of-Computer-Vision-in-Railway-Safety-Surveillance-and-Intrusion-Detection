@@ -1,7 +1,7 @@
 import os
 import cv2
 import base64
-from flask import Blueprint, request, jsonify, Response, render_template
+from flask import Blueprint, request, jsonify, Response, render_template, send_from_directory
 
 from app import config
 from app.services import detector
@@ -11,6 +11,13 @@ stream_bp = Blueprint('stream', __name__)
 @stream_bp.route('/')
 def index():
     return render_template('index.html')
+
+@stream_bp.route('/audio_alerts/<path:filename>')
+def serve_audio(filename):
+    audio_dir = os.path.join(config.BASE_DIR, "audio_alerts")
+    if not os.path.exists(audio_dir):
+        audio_dir = os.path.join(getattr(config, 'BUNDLE_DIR', config.BASE_DIR), "audio_alerts")
+    return send_from_directory(audio_dir, filename)
 
 @stream_bp.route('/upload_video', methods=['POST'])
 def upload_video():

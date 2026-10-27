@@ -10,6 +10,7 @@ datas = [
     ('templates', 'templates'),
     ('static', 'static'),
     ('configs', 'configs'),
+    ('audio_alerts', 'audio_alerts'),
 ]
 datas += collect_data_files('ultralytics')
 datas += collect_data_files('openvino')
@@ -20,7 +21,6 @@ binaries += collect_dynamic_libs('openvino')
 
 # Thu thập các module ẩn (dynamic imports của YOLO & OpenVINO)
 hiddenimports = [
-    'unittest',
     'engineio.async_drivers.threading',
     'cv2',
     'torch',
@@ -40,6 +40,11 @@ excludes = [
     'IPython',
     'jupyter',
     'notebook',
+    'tensorboard',
+    'pytest',
+    'pip',
+    'setuptools',
+    'wheel',
 ]
 
 a = Analysis(

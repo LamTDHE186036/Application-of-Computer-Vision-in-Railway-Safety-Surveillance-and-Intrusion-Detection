@@ -58,7 +58,20 @@ def build():
                     if not os.path.exists(d) and os.path.isfile(s):
                         shutil.copy2(s, d)
 
-    # 4. Tao cau truc thu muc data/ ngang hang voi RailwaySafety.exe
+    # 4. Sao chep audio_alerts/ sang dist/RailwaySafety/audio_alerts/
+    src_audio = os.path.join(base_dir, "audio_alerts")
+    dst_audio = os.path.join(target_dir, "audio_alerts")
+    if os.path.exists(src_audio):
+        print(f"[*] Dang sao chep audio_alerts sang: {dst_audio}")
+        if os.path.exists(dst_audio):
+            shutil.rmtree(dst_audio)
+        shutil.copytree(
+            src_audio,
+            dst_audio,
+            ignore=shutil.ignore_patterns("*.py", "*.pyc", "__pycache__", ".git*")
+        )
+
+    # 5. Tao cau truc thu muc data/ ngang hang voi RailwaySafety.exe (khong sao chep video cu de tiet kiem dung luong)
     dst_data = os.path.join(target_dir, "data")
     dst_recordings = os.path.join(dst_data, "recordings")
     dst_logs = os.path.join(dst_data, "intrusion_logs")
@@ -66,7 +79,7 @@ def build():
     os.makedirs(dst_logs, exist_ok=True)
     print(f"[*] Da tao thu muc data ngang hang tai: {dst_data}")
 
-    # 5. Tao file Khoi_Dong.bat giu lai console de hien thi thong tin va tranh tu dong thoat
+    # 6. Tao file Khoi_Dong.bat giu lai console de hien thi thong tin va tranh tu dong thoat
     bat_content = """@echo off
 title Railway Safety Surveillance System v1.0.0
 cd /d "%~dp0"
@@ -87,7 +100,7 @@ if %ERRORLEVEL% NEQ 0 (
     with open(bat_path, "w", encoding="utf-8") as f:
         f.write(bat_content)
 
-    # 6. Tao file README_HUONG_DAN.txt cho nguoi dung cuoi
+    # 7. Tao file README_HUONG_DAN.txt cho nguoi dung cuoi
     readme_content = """========================================================================
    HE THONG GIAM SAT AN TOAN DUONG SAT VA CANH BAO VI PHAM (V1.0.0)
 ========================================================================

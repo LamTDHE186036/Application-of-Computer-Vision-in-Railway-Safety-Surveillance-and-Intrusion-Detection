@@ -1,6 +1,71 @@
 // ===== QUẢN LÝ GIÁM SÁT & CAMERA / VIDEO =====
+
+// ===== HỆ THỐNG ÂM THANH CẢNH BÁO TỰ ĐỘNG =====
+const alertAudios = {
+    'train_approaching': new Audio('/audio_alerts/tausaptoi.mp3'),
+    'no_train': new Audio('/audio_alerts/khongcotau.mp3')
+};
+
+let currentlyPlayingMode = null;
+
+// Lắng nghe khi hết câu: nếu không còn vi phạm thì giải phóng cờ trạng thái
+Object.values(alertAudios).forEach(a => {
+    a.addEventListener('ended', () => {
+        if (!a.loop) {
+            currentlyPlayingMode = null;
+        }
+    });
+});
+
+function playAlarmAudio(mode) {
+    const audio = alertAudios[mode];
+    if (!audio) return;
+
+    // Nếu đang phát dở bài của chế độ khác, dừng ngay lập tức để phát chế độ mới
+    if (currentlyPlayingMode && currentlyPlayingMode !== mode) {
+        forceStopAlarmAudio();
+    }
+
+    // Đang có vi phạm -> bật chế độ lặp lại (loop = true)
+    audio.loop = true;
+
+    if (audio.paused) {
+        currentlyPlayingMode = mode;
+        audio.play().catch(e => {
+            console.warn("Trình duyệt đang chờ người dùng tương tác để phát âm thanh:", e);
+        });
+    }
+}
+
+// Khi hết xâm nhập: tắt chế độ lặp (loop = false), để âm thanh đọc nốt câu hiện tại rồi tự dừng
+function stopAlarmAudioGracefully() {
+    Object.values(alertAudios).forEach(a => {
+        a.loop = false;
+    });
+}
+
+// Khi người dùng bấm Dừng giám sát hoặc chuyển chế độ: ngắt cưỡng bức ngay lập tức
+function forceStopAlarmAudio() {
+    Object.values(alertAudios).forEach(a => {
+        a.loop = false;
+        if (!a.paused) {
+            a.pause();
+        }
+        a.currentTime = 0;
+    });
+    currentlyPlayingMode = null;
+}
+
+// Mở khóa âm thanh ngay khi người dùng click bất kỳ vị trí nào trên trang
+document.addEventListener('click', () => {
+    Object.values(alertAudios).forEach(a => {
+        a.load();
+    });
+}, { once: true });
+
 function setTrainMode(mode) {
     currentTrainMode = mode;
+    forceStopAlarmAudio();
     updateAlarmUI(false);
 
     fetch('/set_train_mode', {
@@ -34,17 +99,25 @@ function updateAlarmUI(isAlarm) {
         if (isAlarm) {
             header.classList.add('alarm-danger');
             txt.innerText = "Phát hiện vật thể xâm nhập vùng nguy hiểm!";
+            if (isMonitoring) {
+                playAlarmAudio('train_approaching');
+            }
         } else {
             header.classList.add('alarm-safe');
             txt.innerText = "An toàn!";
+            stopAlarmAudioGracefully();
         }
     } else {
         if (isAlarm) {
             header.classList.add('alarm-danger');
             txt.innerText = "Vật thể quá lâu trong vùng nguy hiểm!";
+            if (isMonitoring) {
+                playAlarmAudio('no_train');
+            }
         } else {
             header.classList.add('alarm-safe');
             txt.innerText = "An toàn!";
+            stopAlarmAudioGracefully();
         }
     }
 }
@@ -267,6 +340,7 @@ function startStream(type, ai) {
 
 function stopMonitor() {
     isMonitoring = false;
+    forceStopAlarmAudio();
     updateMonitorButtonUI();
 
     const streamType = currentMode === 'live' ? 'obs' : 'video';
