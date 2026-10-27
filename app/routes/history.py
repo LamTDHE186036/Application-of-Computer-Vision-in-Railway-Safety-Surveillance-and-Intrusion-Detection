@@ -79,7 +79,7 @@ def get_history_events():
                     continue
                 m = re.search(r'(?:(\d{2}-\d{2}-\d{4})\s+)?(\d{2}:\d{2}:\d{2})(?:\s*-\s*(\d{2}:\d{2}:\d{2}))?:\s*(.*?)\s*\(ID\s*(.*?)\)\s*(.*)', line)
                 if m:
-                    d_prefix, start_t, end_t, obj_name, tid, desc = m.groups()
+                    _, start_t, end_t, obj_name, tid, desc = m.groups()
                     if not end_t:
                         end_t = start_t
                     p = list(map(int, start_t.split(':')))

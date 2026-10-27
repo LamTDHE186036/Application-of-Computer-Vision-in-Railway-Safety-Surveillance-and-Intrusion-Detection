@@ -5,7 +5,6 @@ import time
 import datetime
 import os
 import re
-import threading
 from collections import deque
 import openvino as ov
 
@@ -32,6 +31,7 @@ from app.utils.video_utils import (
     format_file_time_str,
     draw_roi as util_draw_roi
 )
+from app.utils.camera_utils import find_obs_camera_index
 from app.services.tracker import (
     reset_tracker as svc_reset_tracker,
     check_roi_intersection,
@@ -104,7 +104,6 @@ def translate_class(eng_name):
     return CLASS_NAMES_VI.get(eng_name.lower(), eng_name)
 
 # --- THAM SỐ CẤU HÌNH TỐI ƯU HÓA HỆ THỐNG ---
-FRAME_SKIP = 2          # Chạy AI mỗi 2 frame để giảm tải CPU/GPU và loại bỏ giật lag
 PRE_ROLL_SECONDS = 3.0  # Lưu trước sự kiện vi phạm 3 giây (Hộp đen Ring Buffer)
 TIMEOUT_SECONDS = 3.0   # Duy trì ghi thêm 3 giây sau sự kiện (Post-roll) và timeout đối tượng
 MIN_CONFIRM_SECONDS = 0.5  # Lọc nhiễu: Phải ở trong ROI >= 0.5s mới xác nhận vi phạm (chống chớp 1-2 frame)
@@ -114,6 +113,7 @@ MIN_EVENT_DURATION = 1.0   # Lọc nhiễu: Tổng thời lượng vi phạm ph�
 active_objects = {}   
 completed_events = [] 
 current_date_str = ""
+recording_start_date_str = ""
 
 is_recording = False
 video_writer = None
@@ -129,21 +129,26 @@ def load_today_events():
     global completed_events, current_date_str
     now = datetime.datetime.now()
     current_date_str = now.strftime("%d-%m-%Y")
+    completed_events.clear()
     
     filename = os.path.join(TXT_DIR, f"Lich_su_{current_date_str}.txt")
     if os.path.exists(filename):
         with open(filename, 'r', encoding='utf-8') as f:
             lines = f.readlines()
             for line in lines:
-                match = re.search(r'(\d{2}:\d{2}:\d{2}) - (\d{2}:\d{2}:\d{2}): (.*?) \(ID (.*?)\) (.*)', line)
+                match = re.search(r'(?:(\d{2}-\d{2}-\d{4})\s+)?(\d{2}:\d{2}:\d{2})\s*-\s*(\d{2}:\d{2}:\d{2}):\s*(.*?)\s*\(ID\s*(.*?)\)\s*(.*)', line)
                 if match:
-                    start, end, name, tid, desc = match.groups()
+                    _, start, end, name, tid, desc = match.groups()
                     completed_events.insert(0, {"id": tid, "name": name, "start": start, "end": end, "desc": desc.strip()})
-                elif "đã đi vào" in line:
-                    match_old = re.search(r'(\d{2}:\d{2}:\d{2}) - (\d{2}:\d{2}:\d{2}): (.*?) \(ID (.*?)\)', line)
-                    if match_old:
-                        start, end, name, tid = match_old.groups()
-                        completed_events.insert(0, {"id": tid, "name": name, "start": start, "end": end, "desc": "đã đi vào vùng nguy hiểm"})
+
+def check_day_transition():
+    """Kiểm tra và tự động chuyển ngày mới (qua nửa đêm)"""
+    global current_date_str
+    now_date = datetime.datetime.now().strftime("%d-%m-%Y")
+    if now_date != current_date_str:
+        load_today_events()
+        return True
+    return False
 
 load_today_events()
 
@@ -164,24 +169,15 @@ def update_txt_file(date_str, tid, start_time, end_time, obj_name, status, mode=
         with open(filename, 'r', encoding='utf-8') as f:
             lines = f.readlines()
             
-    if status == "active":
-        found = False
-        for i in range(len(lines)):
-            if lines[i].startswith(target_prefix):
-                lines[i] = target_str_active
-                found = True
-                break
-        if not found:
-            lines.append(target_str_active)
-    elif status == "done":
-        found = False
-        for i in range(len(lines)):
-            if lines[i].startswith(target_prefix):
-                lines[i] = target_str_done
-                found = True
-                break
-        if not found:
-            lines.append(target_str_done)
+    target_str = target_str_active if status == "active" else target_str_done
+    found = False
+    for i in range(len(lines)):
+        if lines[i].startswith(target_prefix):
+            lines[i] = target_str
+            found = True
+            break
+    if not found:
+        lines.append(target_str)
 
     try:
         with open(filename, 'w', encoding='utf-8') as f:
@@ -208,12 +204,7 @@ def remove_active_txt_entry(date_str, tid, start_time, obj_name):
         pass
 
 def generate_html():
-    global completed_events, current_date_str
-    
-    now_date = datetime.datetime.now().strftime("%d-%m-%Y")
-    if now_date != current_date_str:
-        completed_events.clear()
-        current_date_str = now_date
+    check_day_transition()
 
     html_text = ""
     for tid, data in active_objects.items():
@@ -284,11 +275,6 @@ def process_and_draw(frame, results, fps, stream_type="webcam", current_time=Non
             obj_name_vn = translate_class(obj_name)
             
             track_id = str(int(box.id[0])) if box.id is not None else "?"
-            label = f"{obj_name_vn} - ID: {track_id}"
-
-            intersect = False
-            if has_roi:
-                intersect = check_roi_intersection((x1, y1, x2, y2), roi_mask, pts, (h, w))
 
             # Nếu là Tàu hỏa: Tàu lưu thông hợp lệ trên ray, KHÔNG vẽ bbox, KHÔNG lưu sự kiện, KHÔNG cảnh báo vi phạm
             if obj_name == "train":
@@ -299,6 +285,12 @@ def process_and_draw(frame, results, fps, stream_type="webcam", current_time=Non
                 if track_id in roi_dwell_tracker:
                     del roi_dwell_tracker[track_id]
                 continue
+
+            label = f"{obj_name_vn} - ID: {track_id}"
+
+            intersect = False
+            if has_roi:
+                intersect = check_roi_intersection((x1, y1, x2, y2), roi_mask, pts, (h, w))
             
             is_violation = False
             current_train_mode = getattr(config, 'train_mode', 'train_approaching')
@@ -326,6 +318,7 @@ def process_and_draw(frame, results, fps, stream_type="webcam", current_time=Non
                         active_objects[track_id] = {
                             "name": obj_name,
                             "mode": current_train_mode,
+                            "entry_date": date_str,
                             "start_time_str": enter_str,
                             "enter_time": enter_t,
                             "last_seen": current_time,
@@ -363,22 +356,25 @@ def process_and_draw(frame, results, fps, stream_type="webcam", current_time=Non
                 mode = data.get("mode", "train_approaching")
                 name_vn = translate_class(data["name"])
 
+                entry_d = data.get("entry_date", date_str)
+
                 # KIỂM TRA ĐỘ DÀI SỰ KIỆN: Nếu xuất hiện quá ngắn (< MIN_EVENT_DURATION) thì HỦY BỎ hoàn toàn
                 total_duration = max(0.0, data["last_seen"] - data.get("enter_time", data["last_seen"]))
                 if total_duration < MIN_EVENT_DURATION:
-                    remove_active_txt_entry(date_str, tid, data["start_time_str"], data["name"])
+                    remove_active_txt_entry(entry_d, tid, data["start_time_str"], data["name"])
                     ids_to_remove.append(tid)
                     continue
 
                 has_valid_event_in_recording = True
+                overnight_note = f" (vắt qua ngày {date_str})" if entry_d != date_str else ""
 
                 if mode == "no_train":
                     total_dwell = max(1, int(total_duration))
-                    desc = f"ở trong vùng nguy hiểm {total_dwell} giây"
-                    update_txt_file(date_str, tid, data["start_time_str"], end_time_str, data["name"], "done", mode="no_train", dwell_sec=total_dwell)
+                    desc = f"ở trong vùng nguy hiểm {total_dwell} giây{overnight_note}"
+                    update_txt_file(entry_d, tid, data["start_time_str"], end_time_str, data["name"], "done", mode="no_train", dwell_sec=total_dwell)
                 else:
-                    desc = "đã đi vào vùng nguy hiểm"
-                    update_txt_file(date_str, tid, data["start_time_str"], end_time_str, data["name"], "done", mode="train_approaching")
+                    desc = f"đã đi vào vùng nguy hiểm{overnight_note}"
+                    update_txt_file(entry_d, tid, data["start_time_str"], end_time_str, data["name"], "done", mode="train_approaching")
 
                 completed_events.insert(0, {"id": tid, "name": name_vn, "start": data["start_time_str"], "end": end_time_str, "desc": desc})
                 ids_to_remove.append(tid)
@@ -394,6 +390,7 @@ def process_and_draw(frame, results, fps, stream_type="webcam", current_time=Non
         last_activity_time = current_time
         if not is_recording:
             is_recording = True
+            recording_start_date_str = date_str
             has_valid_event_in_recording = False
             pre_roll_len = len(pre_roll_buffer)
             pre_roll_sec = pre_roll_len / fps if fps > 0 else 0
@@ -427,9 +424,10 @@ def process_and_draw(frame, results, fps, stream_type="webcam", current_time=Non
                             pass
                 else:
                     recording_end_time_str = file_time_str
-                    day_dir = os.path.join(VID_DIR, date_str)
+                    rec_date = recording_start_date_str if recording_start_date_str else date_str
+                    day_dir = os.path.join(VID_DIR, rec_date)
                     os.makedirs(day_dir, exist_ok=True)
-                    final_filename = os.path.join(day_dir, f"{date_str}_{recording_start_time_str}_den_{recording_end_time_str}.mp4")
+                    final_filename = os.path.join(day_dir, f"{rec_date}_{recording_start_time_str}_den_{recording_end_time_str}.mp4")
                     try:
                         os.rename(temp_video_filename, final_filename)
                         convert_video_to_h264_async(final_filename)
@@ -456,9 +454,10 @@ def cleanup_recording(stream_type="webcam", current_dt=None, base_dt=None):
     date_str = now.strftime("%d-%m-%Y")
     
     for tid, data in list(active_objects.items()):
+        entry_d = data.get("entry_date", date_str)
         total_duration = max(0.0, data["last_seen"] - data.get("enter_time", data["last_seen"]))
         if total_duration < MIN_EVENT_DURATION:
-            remove_active_txt_entry(date_str, tid, data["start_time_str"], data["name"])
+            remove_active_txt_entry(entry_d, tid, data["start_time_str"], data["name"])
             continue
 
         has_valid_event_in_recording = True
@@ -468,13 +467,15 @@ def cleanup_recording(stream_type="webcam", current_dt=None, base_dt=None):
         mode = data.get("mode", "train_approaching")
         name_vn = translate_class(data["name"])
 
+        overnight_note = f" (vắt qua ngày {date_str})" if entry_d != date_str else ""
+
         if mode == "no_train":
             total_dwell = max(1, int(total_duration))
-            desc = f"ở trong vùng nguy hiểm {total_dwell} giây"
-            update_txt_file(date_str, tid, data["start_time_str"], end_time_str, data["name"], "done", mode="no_train", dwell_sec=total_dwell)
+            desc = f"ở trong vùng nguy hiểm {total_dwell} giây{overnight_note}"
+            update_txt_file(entry_d, tid, data["start_time_str"], end_time_str, data["name"], "done", mode="no_train", dwell_sec=total_dwell)
         else:
-            desc = "đã đi vào vùng nguy hiểm"
-            update_txt_file(date_str, tid, data["start_time_str"], end_time_str, data["name"], "done", mode="train_approaching")
+            desc = f"đã đi vào vùng nguy hiểm{overnight_note}"
+            update_txt_file(entry_d, tid, data["start_time_str"], end_time_str, data["name"], "done", mode="train_approaching")
 
         completed_events.insert(0, {"id": tid, "name": name_vn, "start": data["start_time_str"], "end": end_time_str, "desc": desc})
     
@@ -494,7 +495,7 @@ def cleanup_recording(stream_type="webcam", current_dt=None, base_dt=None):
                     pass
         else:
             now_str = now.strftime("%Hh%Mm%Ss")
-            day_str = current_date_str if current_date_str else date_str
+            day_str = recording_start_date_str if recording_start_date_str else (current_date_str if current_date_str else date_str)
             day_dir = os.path.join(VID_DIR, day_str)
             os.makedirs(day_dir, exist_ok=True)
             final_filename = os.path.join(day_dir, f"{day_str}_{recording_start_time_str}_den_{now_str}.mp4")
@@ -511,7 +512,6 @@ def reset_tracker():
 def generate_frames(stream_type):
     global pre_roll_buffer
     if stream_type in ("obs", "webcam"):
-        from app.utils.camera_utils import find_obs_camera_index
         obs_idx = find_obs_camera_index(config.load_obs_cam_from_file())
         print(f"[*] Đang mở camera OBS Virtual Camera (Index {obs_idx})...")
         cap = cv2.VideoCapture(obs_idx, cv2.CAP_DSHOW)
@@ -520,8 +520,7 @@ def generate_frames(stream_type):
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
     else:
-        temp_path = os.path.join(config.BASE_DIR, "temp_video.mp4")
-        cap = cv2.VideoCapture(temp_path)
+        cap = cv2.VideoCapture(config.TEMP_VIDEO_PATH)
 
     fps = cap.get(cv2.CAP_PROP_FPS)
     if fps is None or np.isnan(fps) or fps <= 0 or fps > 120:

@@ -666,8 +666,30 @@
         </div>
     </div>
 
+    <!-- ===== MODAL CẢNH BÁO MỞ TRÙNG TAB (SINGLE TAB ENFORCEMENT) ===== -->
+    <div id="duplicate_tab_overlay" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(8px); z-index: 999999; justify-content: center; align-items: center; padding: 20px;">
+        <div style="background: #ffffff; border-radius: 14px; max-width: 460px; width: 100%; padding: 30px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4); text-align: center; border: 1px solid #e2e8f0;">
+            <div style="width: 60px; height: 60px; background: #fef2f2; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: #dc2626;">
+                <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+            </div>
+            <h2 style="font-size: 19px; font-weight: 700; color: #0f172a; margin-bottom: 10px;">Hệ thống đang mở ở Tab khác</h2>
+            <p style="font-size: 14px; color: #475569; line-height: 1.6; margin-bottom: 22px;">
+                Để tránh xung đột Camera và dữ liệu giám sát AI, phần mềm chỉ cho phép hoạt động trên <strong>1 tab duy nhất</strong> trên máy tính này.
+            </p>
+            <div style="display: flex; gap: 12px; justify-content: center;">
+                <button type="button" onclick="claimTabControl()" style="background: #0284c7; color: #ffffff; border: none; padding: 11px 22px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
+                    Sử dụng tại Tab này
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- JavaScript Modules -->
+    <script src="{{ url_for('static', filename='js/tab_lock.js') }}"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     <script src="{{ url_for('static', filename='js/roi.js') }}"></script>
     <script src="{{ url_for('static', filename='js/monitor.js') }}?v=3"></script>

@@ -147,7 +147,7 @@ def get_system_cameras():
 
     return cameras
 
-def find_obs_camera_index(configured_val="auto"):
+def find_obs_camera_index(configured_val="auto", cameras=None):
     """
     Xác định index của OBS Virtual Camera.
     1. Nếu người dùng cấu hình một số nguyên (ví dụ: 0, 1...), ưu tiên trả về số đó.
@@ -164,7 +164,8 @@ def find_obs_camera_index(configured_val="auto"):
             except ValueError:
                 pass
 
-    cameras = get_system_cameras()
+    if cameras is None:
+        cameras = get_system_cameras()
     # Tìm camera có 'obs' trong tên
     for cam in cameras:
         if cam.get('is_obs'):

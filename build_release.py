@@ -71,7 +71,29 @@ def build():
             ignore=shutil.ignore_patterns("*.py", "*.pyc", "__pycache__", ".git*")
         )
 
-    # 5. Tao cau truc thu muc data/ ngang hang voi RailwaySafety.exe (khong sao chep video cu de tiet kiem dung luong)
+    # 5. Sao chep ffmpeg.exe sang dist/RailwaySafety/ de ho tro chuyen doi video chuan web H.264
+    src_ffmpeg = os.path.join(base_dir, "ffmpeg.exe")
+    dst_ffmpeg = os.path.join(target_dir, "ffmpeg.exe")
+    if not os.path.exists(src_ffmpeg):
+        try:
+            import imageio_ffmpeg
+            cand = imageio_ffmpeg.get_ffmpeg_exe()
+            if cand and os.path.exists(cand):
+                src_ffmpeg = cand
+        except Exception:
+            pass
+    if not os.path.exists(src_ffmpeg):
+        cand = shutil.which("ffmpeg")
+        if cand and os.path.exists(cand):
+            src_ffmpeg = cand
+
+    if src_ffmpeg and os.path.exists(src_ffmpeg):
+        print(f"[*] Dang sao chep ffmpeg.exe sang: {dst_ffmpeg}")
+        shutil.copy2(src_ffmpeg, dst_ffmpeg)
+    else:
+        print("[!] CANH BAO: Khong tim thay ffmpeg.exe de sao chep vao goi phan phoi!")
+
+    # 6. Tao cau truc thu muc data/ ngang hang voi RailwaySafety.exe (khong sao chep video cu de tiet kiem dung luong)
     dst_data = os.path.join(target_dir, "data")
     dst_recordings = os.path.join(dst_data, "recordings")
     dst_logs = os.path.join(dst_data, "intrusion_logs")

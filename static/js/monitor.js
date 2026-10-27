@@ -176,7 +176,6 @@ function setMode(mode) {
             statusBadge.className = "status-badge";
         }
         fetch('/stop_stream/obs').catch(() => {});
-        fetch('/stop_stream/webcam').catch(() => {});
 
         const mainImg = document.getElementById('main_preview');
         if (!mainImg.src || mainImg.src === window.location.href) {
@@ -306,6 +305,7 @@ async function startMonitor() {
 }
 
 function startStream(type, ai) {
+    if (typeof isTabBlocked === 'function' && isTabBlocked()) return;
     const conf = currentConfValue;
     fetch(`/start_stream/${type}?conf=${conf}&ai=${ai}`).then(() => {
         const mainImg = document.getElementById('main_preview');
@@ -316,6 +316,7 @@ function startStream(type, ai) {
 
         clearInterval(pollInterval);
         pollInterval = setInterval(async () => {
+            if (typeof isTabBlocked === 'function' && isTabBlocked()) return;
             try {
                 const res = await fetch(`/get_data/${type}`);
                 if (res.ok) {

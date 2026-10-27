@@ -5,10 +5,9 @@ from app import config
 from app.routes import register_blueprints
 
 def cleanup_on_shutdown():
-    temp_path = os.path.join(config.BASE_DIR, "temp_video.mp4")
-    if os.path.exists(temp_path):
+    if os.path.exists(config.TEMP_VIDEO_PATH):
         try:
-            os.remove(temp_path)
+            os.remove(config.TEMP_VIDEO_PATH)
         except Exception:
             pass
 
@@ -38,5 +37,3 @@ def create_app():
     register_blueprints(app)
 
     return app
-
-app = create_app()

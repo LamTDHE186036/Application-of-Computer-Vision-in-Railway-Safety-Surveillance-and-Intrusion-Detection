@@ -12,33 +12,20 @@ def get_config():
         "classes": config.load_classes_from_file(),
         "dwell_time": config.load_dwell_from_file(),
         "train_mode": config.load_train_mode_from_file(),
-        "obs_cam": config.load_obs_cam_from_file(),
-        "droidcam_url": ""
+        "obs_cam": config.load_obs_cam_from_file()
     })
 
 @settings_bp.route('/get_cameras', methods=['GET'])
 def get_cameras():
     cameras = get_system_cameras()
     configured = config.load_obs_cam_from_file()
-    active_index = find_obs_camera_index(configured)
+    active_index = find_obs_camera_index(configured, cameras=cameras)
     return jsonify({
         "status": "success",
         "cameras": cameras,
         "configured": configured,
         "active_index": active_index
     })
-
-@settings_bp.route('/set_obs_cam', methods=['POST'])
-def set_obs_cam():
-    data = request.json or {}
-    cam = str(data.get('obs_cam', 'auto')).strip()
-    config.obs_cam = cam
-    config.save_obs_cam_to_file(cam)
-    return jsonify({"status": "success", "obs_cam": config.load_obs_cam_from_file()})
-
-@settings_bp.route('/set_droidcam_url', methods=['POST'])
-def set_droidcam_url():
-    return jsonify({"status": "success", "droidcam_url": ""})
 
 @settings_bp.route('/set_train_mode', methods=['POST'])
 def set_train_mode():
@@ -61,24 +48,12 @@ def set_roi():
         
     return jsonify({"status": "success"})
 
-@settings_bp.route('/set_conf', methods=['POST'])
-def set_conf():
-    data = request.json
-    if data and 'conf' in data:
-        val = float(data['conf'])
-        config.current_conf["obs"] = val
-        config.current_conf["webcam"] = val
-        config.current_conf["video"] = val
-        config.save_conf_to_file(val)
-    return jsonify({"status": "success"})
-
 @settings_bp.route('/set_settings', methods=['POST'])
 def set_settings():
     data = request.json or {}
     if 'conf' in data:
         val = float(data['conf'])
         config.current_conf["obs"] = val
-        config.current_conf["webcam"] = val
         config.current_conf["video"] = val
         config.save_conf_to_file(val)
     if 'classes' in data and isinstance(data['classes'], list):
@@ -94,9 +69,9 @@ def set_settings():
         config.save_obs_cam_to_file(cam)
     return jsonify({
         "status": "success",
-        "conf": config.load_conf_from_file(),
-        "classes": config.load_classes_from_file(),
-        "dwell_time": config.load_dwell_from_file(),
-        "train_mode": config.load_train_mode_from_file(),
-        "obs_cam": config.load_obs_cam_from_file()
+        "conf": config.current_conf.get("obs", config.initial_conf),
+        "classes": config.selected_classes,
+        "dwell_time": config.dwell_time,
+        "train_mode": config.train_mode,
+        "obs_cam": config.obs_cam
     })

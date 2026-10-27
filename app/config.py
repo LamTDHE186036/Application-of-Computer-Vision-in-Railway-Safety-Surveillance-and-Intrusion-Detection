@@ -22,6 +22,7 @@ BASE_DIR = APP_DIR
 DATA_DIR = os.path.join(BASE_DIR, "data")
 RECORDINGS_DIR = os.path.join(DATA_DIR, "recordings")
 INTRUSION_LOGS_DIR = os.path.join(DATA_DIR, "intrusion_logs")
+TEMP_VIDEO_PATH = os.path.join(BASE_DIR, "temp_video.mp4")
 
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(RECORDINGS_DIR, exist_ok=True)
@@ -134,12 +135,6 @@ def load_obs_cam_from_file():
 def save_obs_cam_to_file(cam):
     _save_detection_json({"obs_cam": str(cam).strip()})
 
-# Giữ tương thích ngược tạm thời nếu có lời gọi cũ
-def load_droidcam_url_from_file():
-    return ""
-
-def save_droidcam_url_to_file(url):
-    pass
 
 # --- KHỞI TẠO BIẾN TOÀN CỤC (GLOBAL STATE) ---
 roi_polygon = load_roi_from_file()
@@ -151,14 +146,12 @@ obs_cam = load_obs_cam_from_file()
 
 latest_data = {
     "obs": {"text": "", "alarm": False},
-    "webcam": {"text": "", "alarm": False},
     "video": {"text": "", "alarm": False}
 }
-stream_active = {"obs": False, "webcam": False, "video": False}
-ai_active = {"obs": False, "webcam": False, "video": False} 
+stream_active = {"obs": False, "video": False}
+ai_active = {"obs": False, "video": False} 
 current_conf = {
     "obs": initial_conf,
-    "webcam": initial_conf,
     "video": initial_conf
 }
 

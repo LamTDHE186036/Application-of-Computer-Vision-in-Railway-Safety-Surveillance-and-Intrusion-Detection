@@ -60,14 +60,17 @@ function updateHistoryLiveStatus() {
     }
 }
 
+let isCustomDateSelected = false;
+
 async function initHistoryView() {
-    if (!selectedHistoryDate) {
-        const today = new Date();
-        const dd = String(today.getDate()).padStart(2, '0');
-        const mm = String(today.getMonth() + 1).padStart(2, '0');
-        const yyyy = today.getFullYear();
-        
-        selectedHistoryDate = `${dd}-${mm}-${yyyy}`;
+    const today = new Date();
+    const dd = String(today.getDate()).padStart(2, '0');
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const yyyy = today.getFullYear();
+    const todayFormatted = `${dd}-${mm}-${yyyy}`;
+
+    if (!isCustomDateSelected) {
+        selectedHistoryDate = todayFormatted;
         const dateInput = document.getElementById('history_date_input');
         if (dateInput) {
             dateInput.value = `${yyyy}-${mm}-${dd}`;
@@ -81,6 +84,11 @@ function onHistoryDatePicked(val) {
     const parts = val.split('-');
     if (parts.length === 3) {
         selectedHistoryDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        const today = new Date();
+        const dd = String(today.getDate()).padStart(2, '0');
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const yyyy = today.getFullYear();
+        isCustomDateSelected = (selectedHistoryDate !== `${dd}-${mm}-${yyyy}`);
         loadHistoryEvents(selectedHistoryDate);
     }
 }
@@ -89,6 +97,9 @@ function pickQuickDate(type) {
     const date = new Date();
     if (type === 'yesterday') {
         date.setDate(date.getDate() - 1);
+        isCustomDateSelected = true;
+    } else {
+        isCustomDateSelected = false;
     }
     const dd = String(date.getDate()).padStart(2, '0');
     const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -145,6 +156,17 @@ function applyHistoryFilter() {
 }
 
 async function reloadHistoryEvents() {
+    if (!isCustomDateSelected) {
+        const today = new Date();
+        const dd = String(today.getDate()).padStart(2, '0');
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const yyyy = today.getFullYear();
+        selectedHistoryDate = `${dd}-${mm}-${yyyy}`;
+        const dateInput = document.getElementById('history_date_input');
+        if (dateInput) {
+            dateInput.value = `${yyyy}-${mm}-${dd}`;
+        }
+    }
     await loadHistoryEvents(selectedHistoryDate);
 }
 

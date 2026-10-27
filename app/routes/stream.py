@@ -22,10 +22,9 @@ def serve_audio(filename):
 @stream_bp.route('/upload_video', methods=['POST'])
 def upload_video():
     file = request.files['video']
-    temp_path = os.path.join(config.BASE_DIR, "temp_video.mp4")
-    file.save(temp_path)
+    file.save(config.TEMP_VIDEO_PATH)
     
-    cap = cv2.VideoCapture(temp_path)
+    cap = cv2.VideoCapture(config.TEMP_VIDEO_PATH)
     ret, frame = cap.read()
     cap.release()
     if ret:
@@ -37,9 +36,8 @@ def upload_video():
 @stream_bp.route('/delete_video', methods=['POST'])
 def delete_video():
     try:
-        temp_path = os.path.join(config.BASE_DIR, "temp_video.mp4")
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        if os.path.exists(config.TEMP_VIDEO_PATH):
+            os.remove(config.TEMP_VIDEO_PATH)
         return jsonify({"status": "success"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
@@ -71,4 +69,9 @@ def get_data(stream_type):
 
 @stream_bp.route('/get_events', methods=['GET'])
 def get_events():
-    return jsonify({"text": detector.generate_html()})
+    import datetime
+    return jsonify({
+        "status": "success",
+        "date": datetime.datetime.now().strftime("%d-%m-%Y"),
+        "text": detector.generate_html()
+    })

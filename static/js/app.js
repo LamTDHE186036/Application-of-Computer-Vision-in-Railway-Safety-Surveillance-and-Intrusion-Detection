@@ -12,15 +12,43 @@ let currentClassesList = ["person", "car", "truck-bus", "motorcycle"];
 let currentTrainMode = 'train_approaching';
 let currentDwellValue = 5.0;
 
-// Khởi tạo đồng hồ Topbar
+let lastDateHyphen = '';
+
+// Khởi tạo đồng hồ Topbar & Tự động phát hiện chuyển ngày (00:00:00)
 function updateClock() {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('vi-VN');
-    const dateStr = String(now.getDate()).padStart(2, '0') + '/' + String(now.getMonth() + 1).padStart(2, '0') + '/' + now.getFullYear();
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyy = now.getFullYear();
+    const dateSlash = `${dd}/${mm}/${yyyy}`;
+    const dateHyphen = `${dd}-${mm}-${yyyy}`;
+
     const topbarTime = document.getElementById('topbar_time');
     const topbarDate = document.getElementById('topbar_date');
     if (topbarTime) topbarTime.innerText = timeStr;
-    if (topbarDate) topbarDate.innerText = dateStr;
+    if (topbarDate) topbarDate.innerText = dateSlash;
+
+    // Tự động chuyển ngày cho khung sự kiện (kể cả khi camera đang dừng)
+    if (lastDateHyphen && lastDateHyphen !== dateHyphen) {
+        lastDateHyphen = dateHyphen;
+        const dateLabel = document.getElementById('current_date_label');
+        if (dateLabel) dateLabel.innerText = dateHyphen;
+
+        fetch('/get_events')
+            .then(r => r.json())
+            .then(evtData => {
+                if (evtData && evtData.text !== undefined) {
+                    const el = document.getElementById('events_log');
+                    if (el) el.innerHTML = evtData.text;
+                }
+            })
+            .catch(() => {});
+    } else if (!lastDateHyphen) {
+        lastDateHyphen = dateHyphen;
+        const dateLabel = document.getElementById('current_date_label');
+        if (dateLabel) dateLabel.innerText = dateHyphen;
+    }
 }
 
 async function refreshObsCameraInfo() {
@@ -49,11 +77,6 @@ async function refreshObsCameraInfo() {
 window.addEventListener('DOMContentLoaded', async () => {
     setInterval(updateClock, 1000);
     updateClock();
-
-    const today = new Date();
-    const dateStr = String(today.getDate()).padStart(2, '0') + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + today.getFullYear();
-    const dateLabel = document.getElementById('current_date_label');
-    if (dateLabel) dateLabel.innerText = dateStr;
 
     try {
         const res = await fetch('/get_config');

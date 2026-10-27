@@ -15,9 +15,11 @@ datas = [
 datas += collect_data_files('ultralytics')
 datas += collect_data_files('openvino')
 
-# Thu thập thư viện động C++/DLLs
+# Thu thập thư viện động C++/DLLs và file thực thi nhị phân
 binaries = []
 binaries += collect_dynamic_libs('openvino')
+if os.path.exists('ffmpeg.exe'):
+    binaries.append(('ffmpeg.exe', '.'))
 
 # Thu thập các module ẩn (dynamic imports của YOLO & OpenVINO)
 hiddenimports = [
