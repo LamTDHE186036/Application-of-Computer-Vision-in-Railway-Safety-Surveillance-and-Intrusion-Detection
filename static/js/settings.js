@@ -61,10 +61,12 @@ function openSettingsModal() {
                     detectedBadge.innerText = "Đã kết nối OBS";
                     detectedBadge.style.background = "#ecfdf5";
                     detectedBadge.style.color = "#059669";
+                    detectedBadge.style.borderColor = "#a7f3d0";
                 } else {
                     detectedBadge.innerText = "Chờ bật Virtual Cam";
                     detectedBadge.style.background = "#fffbeb";
                     detectedBadge.style.color = "#d97706";
+                    detectedBadge.style.borderColor = "#fde68a";
                 }
             }
         }).catch(e => console.warn("Lỗi tải camera:", e));

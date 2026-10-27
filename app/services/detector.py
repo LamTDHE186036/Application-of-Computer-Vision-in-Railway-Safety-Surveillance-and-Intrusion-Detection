@@ -94,7 +94,7 @@ os.makedirs(VID_DIR, exist_ok=True)
 # --- TỪ ĐIỂN DỊCH NHÃN YOLO SANG TIẾNG VIỆT CHUẨN ---
 CLASS_NAMES_VI = {
     "person": "Người",
-    "motorcycle": "Xe máy",
+    "motorcycle": "Xe máy/Xe đạp",
     "car": "Ô tô",
     "truck-bus": "Xe tải/Xe buýt",
     "train": "Tàu hỏa"
@@ -226,7 +226,7 @@ def draw_roi(frame):
 def process_and_draw(frame, results, fps, stream_type="webcam", current_time=None, current_dt=None, base_video_datetime=None):
     global active_objects, completed_events, current_date_str
     global is_recording, video_writer, temp_video_filename, recording_start_time_str, last_activity_time
-    global pre_roll_buffer, has_valid_event_in_recording
+    global pre_roll_buffer, has_valid_event_in_recording, recording_start_date_str
 
     if current_dt is None:
         current_dt = datetime.datetime.now()
@@ -259,10 +259,6 @@ def process_and_draw(frame, results, fps, stream_type="webcam", current_time=Non
             if hasattr(config, 'selected_classes') and config.selected_classes is not None:
                 is_selected = False
                 if obj_name in config.selected_classes:
-                    is_selected = True
-                elif obj_name in ["truck", "bus"] and "truck-bus" in config.selected_classes:
-                    is_selected = True
-                elif obj_name == "bicycle" and "motorcycle" in config.selected_classes:
                     is_selected = True
                 elif obj_name == "train":
                     is_selected = True
@@ -411,40 +407,46 @@ def process_and_draw(frame, results, fps, stream_type="webcam", current_time=Non
         # Nếu không còn đối tượng vi phạm, duy trì ghi tiếp cho đến khi hết TIMEOUT_SECONDS (Post-roll)
         if is_recording and (current_time - last_activity_time > TIMEOUT_SECONDS):
             is_recording = False
-            if video_writer:
-                video_writer.release()
-                video_writer = None
-                
-                # Nếu không có sự kiện vi phạm hợp lệ nào (chỉ là nhiễu nháy) -> Xóa video tạm
-                if not has_valid_event_in_recording:
-                    if os.path.exists(temp_video_filename):
+            try:
+                if video_writer:
+                    video_writer.release()
+                    video_writer = None
+
+                    # Nếu không có sự kiện vi phạm hợp lệ nào (chỉ là nhiễu nháy) -> Xóa video tạm
+                    if not has_valid_event_in_recording:
+                        if os.path.exists(temp_video_filename):
+                            try:
+                                os.remove(temp_video_filename)
+                            except Exception:
+                                pass
+                    else:
+                        recording_end_time_str = file_time_str
+                        rec_date = recording_start_date_str if recording_start_date_str else date_str
+                        day_dir = os.path.join(VID_DIR, rec_date)
+                        os.makedirs(day_dir, exist_ok=True)
+                        final_filename = os.path.join(day_dir, f"{rec_date}_{recording_start_time_str}_den_{recording_end_time_str}.mp4")
                         try:
-                            os.remove(temp_video_filename)
+                            os.rename(temp_video_filename, final_filename)
+                            convert_video_to_h264_async(final_filename)
                         except Exception:
                             pass
-                else:
-                    recording_end_time_str = file_time_str
-                    rec_date = recording_start_date_str if recording_start_date_str else date_str
-                    day_dir = os.path.join(VID_DIR, rec_date)
-                    os.makedirs(day_dir, exist_ok=True)
-                    final_filename = os.path.join(day_dir, f"{rec_date}_{recording_start_time_str}_den_{recording_end_time_str}.mp4")
-                    try:
-                        os.rename(temp_video_filename, final_filename)
-                        convert_video_to_h264_async(final_filename)
-                    except Exception:
-                        pass
+            except Exception as e_rec:
+                print(f"[!] Canh bao khi dong goi video vi pham: {e_rec}")
 
     # Ghi frame hiện tại vào video nếu đang ghi, hoặc lưu vào pre_roll_buffer nếu chưa ghi
     if is_recording and video_writer:
-        video_writer.write(frame)
+        try:
+            video_writer.write(frame)
+        except Exception:
+            pass
     else:
         pre_roll_buffer.append(frame.copy())
-            
-    return frame, generate_html(), has_danger 
+
+    return frame, generate_html(), has_danger
 
 def cleanup_recording(stream_type="webcam", current_dt=None, base_dt=None):
     global is_recording, video_writer, temp_video_filename, recording_start_time_str
-    global active_objects, completed_events, pre_roll_buffer, has_valid_event_in_recording
+    global active_objects, completed_events, pre_roll_buffer, has_valid_event_in_recording, recording_start_date_str
     
     if current_dt is None:
         now = datetime.datetime.now()
@@ -547,19 +549,37 @@ def generate_frames(stream_type):
             start_time = time.time()
             ret, frame = cap.read()
             if not ret or frame is None:
-                if stream_type == "video": 
-                    cleanup_recording(stream_type, current_dt, base_video_datetime)
+                if stream_type == "video":
+                    # Video kết thúc -> Tự động phát lặp lại vô tận từ đầu tệp
+                    try:
+                        cleanup_recording(stream_type, current_dt, base_video_datetime)
+                    except Exception:
+                        pass
                     reset_tracker()
                     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    ret, frame = cap.read()
+                    if not ret or frame is None:
+                        try:
+                            cap.release()
+                            cap = cv2.VideoCapture(config.TEMP_VIDEO_PATH)
+                            ret, frame = cap.read()
+                        except Exception:
+                            pass
+
+                    if not ret or frame is None:
+                        time.sleep(0.05)
+                        continue
+
                     frame_idx = 0
                     base_video_datetime = datetime.datetime.now()
-                    continue
+                    current_dt = base_video_datetime
+                    current_time = 0.0
                 else:
                     camera_retry += 1
                     if camera_retry < 60 and config.stream_active[stream_type]:
                         time.sleep(0.05)
                         continue
-                break
+                    break
             camera_retry = 0
             
             frame_idx += 1
@@ -575,7 +595,10 @@ def generate_frames(stream_type):
                 if not config.roi_polygon or len(config.roi_polygon) < 3:
                     config.ai_active[stream_type] = False
                     if is_recording:
-                        cleanup_recording(stream_type, current_dt, base_video_datetime)
+                        try:
+                            cleanup_recording(stream_type, current_dt, base_video_datetime)
+                        except Exception:
+                            pass
                     res_img = draw_roi(frame.copy())
                     config.latest_data[stream_type] = {"text": generate_html(), "alarm": False}
                 else:
@@ -586,7 +609,7 @@ def generate_frames(stream_type):
                             device=DEVICE, verbose=False, persist=True,
                             tracker=tracker_cfg
                         )
-                    except Exception as e:
+                    except Exception:
                         try:
                             results = model.track(
                                 source=frame, conf=conf, imgsz=640,
@@ -597,14 +620,22 @@ def generate_frames(stream_type):
                             print(f"[!] AI track error: {e2}")
                             results = None
 
-                    res_img, html_text, has_danger = process_and_draw(
-                        frame, results, fps, stream_type=stream_type,
-                        current_time=current_time, current_dt=current_dt, base_video_datetime=base_video_datetime
-                    )
-                    config.latest_data[stream_type] = {"text": html_text, "alarm": has_danger}
+                    try:
+                        res_img, html_text, has_danger = process_and_draw(
+                            frame, results, fps, stream_type=stream_type,
+                            current_time=current_time, current_dt=current_dt, base_video_datetime=base_video_datetime
+                        )
+                        config.latest_data[stream_type] = {"text": html_text, "alarm": has_danger}
+                    except Exception as e_proc:
+                        print(f"[!] Canh bao loi xu ly AI (da cach ly an toan): {e_proc}")
+                        res_img = draw_roi(frame.copy())
+                        cv2.putText(res_img, f"{current_dt.strftime('%d-%m-%Y %H:%M:%S')}", (15, 35), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
             else:
                 if is_recording:
-                    cleanup_recording(stream_type, current_dt, base_video_datetime)
+                    try:
+                        cleanup_recording(stream_type, current_dt, base_video_datetime)
+                    except Exception:
+                        pass
                 res_img = draw_roi(frame.copy())
                 cv2.putText(res_img, f"{current_dt.strftime('%d-%m-%Y %H:%M:%S')}", (15, 35), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
                 config.latest_data[stream_type] = {"text": generate_html(), "alarm": False} 

@@ -149,7 +149,25 @@ function applyHistoryFilter() {
         filteredHistoryEvents = historyEventsData.filter(ev => {
             const name = (ev.object_name || '').toLowerCase();
             const filter = currentClassFilter.toLowerCase();
-            return name.includes(filter) || (filter === 'người' && name.includes('nguoi'));
+
+            // Nhóm Xe máy / Xe đạp
+            if (filter.includes('máy') || filter.includes('đạp') || filter.includes('motorcycle') || filter.includes('bicycle')) {
+                return name.includes('máy') || name.includes('đạp') || name.includes('motorcycle') || name.includes('bicycle');
+            }
+            // Nhóm Xe tải / Xe buýt
+            if (filter.includes('tải') || filter.includes('buýt') || filter.includes('truck') || filter.includes('bus')) {
+                return name.includes('tải') || name.includes('buýt') || name.includes('truck') || name.includes('bus');
+            }
+            // Nhóm Người
+            if (filter.includes('người') || filter.includes('person') || filter.includes('nguoi')) {
+                return name.includes('người') || name.includes('person') || name.includes('nguoi');
+            }
+            // Nhóm Ô tô
+            if (filter.includes('ô tô') || filter.includes('o to') || filter.includes('car')) {
+                return name.includes('ô tô') || name.includes('o to') || name.includes('car');
+            }
+
+            return name.includes(filter) || filter.includes(name);
         });
     }
     renderHistoryEvents();

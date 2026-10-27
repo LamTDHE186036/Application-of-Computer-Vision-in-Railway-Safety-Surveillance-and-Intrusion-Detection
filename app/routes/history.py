@@ -69,6 +69,16 @@ def get_history_events():
                         'end_time': m.group(2).replace('h', ':').replace('m', ':').replace('s', '')
                     })
 
+    def normalize_obj_name(name):
+        if not name:
+            return name
+        n = name.strip()
+        if n in ["Xe máy", "Xe đạp", "motorcycle", "bicycle"]:
+            return "Xe máy/Xe đạp"
+        if n in ["Xe tải", "Xe buýt", "truck", "bus", "truck-bus"]:
+            return "Xe tải/Xe buýt"
+        return n
+
     txt_path = os.path.join(TXT_DIR, f"Lich_su_{date_str}.txt")
     events = []
     if os.path.exists(txt_path):
@@ -105,7 +115,7 @@ def get_history_events():
                         'date': date_str,
                         'start_time': start_t,
                         'end_time': end_t,
-                        'object_name': obj_name,
+                        'object_name': normalize_obj_name(obj_name),
                         'track_id': tid,
                         'desc': desc.strip(),
                         'video_file': fn,
