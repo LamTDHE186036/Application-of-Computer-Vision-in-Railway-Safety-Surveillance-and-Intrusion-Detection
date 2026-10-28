@@ -58,7 +58,7 @@ def load_yolo_model():
     for b_dir in base_dirs:
         model_candidates.extend([
             os.path.join(b_dir, "models", "yolo26s", "model_openvino"),
-            os.path.join(b_dir, "models", "yolo26s", "model.pt"),
+            os.path.join(b_dir, "models", "yolo26s", "model_pytorch", "train-railway-yolo26s-all.pt"),
         ])
 
     selected_model_path = None
@@ -98,7 +98,7 @@ CLASS_NAMES_VI = {
     "car": "Ô tô",
     "truck-bus": "Xe tải/Xe buýt",
     "train": "Tàu hỏa"
-}
+} 
 
 def translate_class(eng_name):
     return CLASS_NAMES_VI.get(eng_name.lower(), eng_name)
