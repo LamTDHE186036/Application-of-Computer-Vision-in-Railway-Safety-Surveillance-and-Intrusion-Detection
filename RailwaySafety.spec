@@ -5,25 +5,20 @@ import os
 
 block_cipher = None
 
-# Thu thập tài nguyên dữ liệu tĩnh
+# Thu thập tài nguyên giao diện web tĩnh (configs và audio_alerts được quản lý ngoài thư mục app bởi build_release.py để tiện tùy chỉnh và tránh trùng lặp)
 datas = [
     ('templates', 'templates'),
     ('static', 'static'),
-    ('configs', 'configs'),
-    ('audio_alerts', 'audio_alerts'),
 ]
 datas += collect_data_files('ultralytics')
 datas += collect_data_files('openvino')
 
-# Thu thập thư viện động C++/DLLs và file thực thi nhị phân
+# Thu thập thư viện động C++/DLLs của OpenVINO (ffmpeg.exe được quản lý ngoài thư mục app bởi build_release.py, tránh đóng gói nhân đôi ~88MB)
 binaries = []
 binaries += collect_dynamic_libs('openvino')
-if os.path.exists('ffmpeg.exe'):
-    binaries.append(('ffmpeg.exe', '.'))
 
 # Thu thập các module ẩn (dynamic imports của YOLO & OpenVINO)
 hiddenimports = [
-    'engineio.async_drivers.threading',
     'cv2',
     'torch',
     'torchvision',
@@ -36,8 +31,9 @@ hiddenimports = [
 hiddenimports += collect_submodules('ultralytics')
 hiddenimports += collect_submodules('openvino')
 
-# Loại trừ các thư viện nặng không dùng đến để tối ưu kích thước gói build
+# Loại trừ các thư viện nặng không dùng đến để tối ưu kích thước gói build (~450MB tiết kiệm)
 excludes = [
+    # Công cụ phát triển & testing
     'tkinter',
     'IPython',
     'jupyter',
@@ -47,6 +43,15 @@ excludes = [
     'pip',
     'setuptools',
     'wheel',
+    # Thư viện phân tích dữ liệu không sử dụng (Tiết kiệm ~360MB)
+    'polars',
+    '_polars_runtime_32',
+    'pyarrow',
+    'llvmlite',
+    'numba',
+    'onnxruntime',
+    # Tránh nhân đôi ffmpeg.exe (~84MB) vì ffmpeg.exe đã được quản lý ngoài thư mục app
+    'imageio_ffmpeg',
 ]
 
 a = Analysis(
@@ -64,6 +69,10 @@ a = Analysis(
     cipher=block_cipher,
     noarchive=False,
 )
+
+# Lọc bỏ triệt để file ffmpeg bị đóng gói nhân đôi trong _internal (tiết kiệm ~84MB)
+a.binaries = [x for x in a.binaries if 'imageio_ffmpeg' not in str(x[0]).lower() and not (str(x[0]).lower().endswith('.exe') and 'ffmpeg' in str(x[0]).lower())]
+a.datas = [x for x in a.datas if 'imageio_ffmpeg' not in str(x[0]).lower()]
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 

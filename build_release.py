@@ -22,7 +22,7 @@ def build():
 
     print("\n[*] PyInstaller hoan tat! Tien hanh chuan bi thu muc phan phoi...")
 
-    # 2. Sao chep duy nhat mo hinh AI can thiet (yolo26s) sang dist/RailwaySafety/models/
+    # 2. Sao chep mo hinh AI can thiet (yolo26s gom OpenVINO va PyTorch .pt du phong) sang dist/RailwaySafety/models/
     src_models = os.path.join(base_dir, "models")
     dst_models = os.path.join(target_dir, "models")
     os.makedirs(dst_models, exist_ok=True)
@@ -30,7 +30,7 @@ def build():
     src_yolo26s = os.path.join(src_models, "yolo26s")
     dst_yolo26s = os.path.join(dst_models, "yolo26s")
     if os.path.exists(src_yolo26s):
-        print(f"[*] Dang sao chep mo hinh AI can thiet sang: {dst_yolo26s}")
+        print(f"[*] Dang sao chep mo hinh AI (OpenVINO + PyTorch fallback) sang: {dst_yolo26s}")
         if os.path.exists(dst_yolo26s):
             shutil.rmtree(dst_yolo26s)
         shutil.copytree(
@@ -39,24 +39,18 @@ def build():
             ignore=shutil.ignore_patterns("*.py", "*.pyc", "__pycache__", ".git*")
         )
 
-    # 3. Sao chep configs/ sang dist/RailwaySafety/configs/
+    # 3. Sao chep configs/ sang dist/RailwaySafety/configs/ (luon ghi de de cap nhat cau hinh moi nhat)
     src_configs = os.path.join(base_dir, "configs")
     dst_configs = os.path.join(target_dir, "configs")
     if os.path.exists(src_configs):
         print(f"[*] Dang sao chep cau hinh configs sang: {dst_configs}")
-        if not os.path.exists(dst_configs):
-            shutil.copytree(
-                src_configs,
-                dst_configs,
-                ignore=shutil.ignore_patterns("*.py", "*.pyc", "__pycache__", ".git*")
-            )
-        else:
-            for item in os.listdir(src_configs):
-                if item.endswith(('.json', '.yaml', '.yml')):
-                    s = os.path.join(src_configs, item)
-                    d = os.path.join(dst_configs, item)
-                    if not os.path.exists(d) and os.path.isfile(s):
-                        shutil.copy2(s, d)
+        os.makedirs(dst_configs, exist_ok=True)
+        for item in os.listdir(src_configs):
+            if item.endswith(('.json', '.yaml', '.yml')):
+                s = os.path.join(src_configs, item)
+                d = os.path.join(dst_configs, item)
+                if os.path.isfile(s):
+                    shutil.copy2(s, d)
 
     # 4. Sao chep audio_alerts/ sang dist/RailwaySafety/audio_alerts/
     src_audio = os.path.join(base_dir, "audio_alerts")
@@ -93,6 +87,19 @@ def build():
     else:
         print("[!] CANH BAO: Khong tim thay ffmpeg.exe de sao chep vao goi phan phoi!")
 
+    # Loai bo ban sao ffmpeg trung lap ben trong _internal de tiet kiem ~84MB
+    internal_dir = os.path.join(target_dir, "_internal")
+    if os.path.exists(internal_dir):
+        for r, d, fs in os.walk(internal_dir):
+            for f in fs:
+                if "ffmpeg" in f.lower() and f.lower().endswith(".exe"):
+                    dup_p = os.path.join(r, f)
+                    try:
+                        os.remove(dup_p)
+                        print(f"[*] Da loai bo ban sao ffmpeg trung lap trong _internal: {dup_p}")
+                    except Exception:
+                        pass
+
     # 6. Tao cau truc thu muc data/ ngang hang voi RailwaySafety.exe (khong sao chep video cu de tiet kiem dung luong)
     dst_data = os.path.join(target_dir, "data")
     dst_recordings = os.path.join(dst_data, "recordings")
@@ -101,7 +108,7 @@ def build():
     os.makedirs(dst_logs, exist_ok=True)
     print(f"[*] Da tao thu muc data ngang hang tai: {dst_data}")
 
-    # 6. Tao file Khoi_Dong.bat giu lai console de hien thi thong tin va tranh tu dong thoat
+    # 7. Tao file Khoi_Dong.bat giu lai console de hien thi thong tin va tranh tu dong thoat
     bat_content = """@echo off
 title Railway Safety Surveillance System v1.0.0
 cd /d "%~dp0"
@@ -122,7 +129,7 @@ if %ERRORLEVEL% NEQ 0 (
     with open(bat_path, "w", encoding="utf-8") as f:
         f.write(bat_content)
 
-    # 7. Tao file README_HUONG_DAN.txt cho nguoi dung cuoi
+    # 8. Tao file README_HUONG_DAN.txt cho nguoi dung cuoi
     readme_content = """========================================================================
    HE THONG GIAM SAT AN TOAN DUONG SAT VA CANH BAO VI PHAM (V1.0.0)
 ========================================================================
