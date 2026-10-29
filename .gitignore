@@ -12,11 +12,14 @@ ENV/
 env.bak/
 venv.bak/
 
-# === PyInstaller & Đóng gói sản phẩm (Build & Dist) ===
+# === PyInstaller, Inno Setup & Đóng gói sản phẩm (Build & Dist) ===
 build/
 dist/
+Output/
 *.manifest
 *.pkg
+vc_redist.x64.exe
+VC_redist.x64.exe
 
 # === Dữ liệu runtime & Nhật ký vi phạm (Không đẩy video/log thực tế lên Git) ===
 data/recordings/*
