@@ -65,4 +65,13 @@ if __name__ == '__main__':
     print("=" * 65)
 
     Timer(1.5, open_browser, args=[port]).start()
-    app.run(host='127.0.0.1', port=port, debug=False)
+    try:
+        app.run(host='127.0.0.1', port=port, debug=False)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        try:
+            from app.utils.video_utils import wait_for_video_converter
+            wait_for_video_converter()
+        except Exception:
+            pass

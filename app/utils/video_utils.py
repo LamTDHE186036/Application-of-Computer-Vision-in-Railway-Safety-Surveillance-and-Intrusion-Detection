@@ -4,11 +4,19 @@ import numpy as np
 import datetime
 import subprocess
 import threading
+import queue
+import time
 
 import sys
 import shutil
 
 _cached_ffmpeg_cmd = None
+
+_video_queue = queue.Queue()
+_worker_thread = None
+_worker_lock = threading.Lock()
+_is_converting = False
+_stop_worker_signal = False
 
 def get_ffmpeg_path():
     """
@@ -69,52 +77,111 @@ def get_ffmpeg_path():
 
     return None
 
+def _process_single_video(video_path):
+    if not os.path.exists(video_path):
+        return
+
+    ffmpeg_bin = get_ffmpeg_path()
+    if not ffmpeg_bin:
+        print(f"[!] Canh bao: Khong tim thay ffmpeg.exe! Video '{os.path.basename(video_path)}' giu nguyen dinh dang goc.")
+        return
+
+    tmp_converted = video_path + ".h264.mp4"
+    cmd = [
+        ffmpeg_bin, '-y', '-i', video_path,
+        '-c:v', 'libx264', '-preset', 'ultrafast',
+        '-movflags', '+faststart',
+        tmp_converted
+    ]
+
+    creation_flags = 0
+    if sys.platform.startswith('win'):
+        creation_flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000)
+
+    try:
+        res = subprocess.run(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=creation_flags
+        )
+        if res.returncode == 0 and os.path.exists(tmp_converted) and os.path.getsize(tmp_converted) > 1000:
+            os.replace(tmp_converted, video_path)
+            print(f"[*] Da chuyen doi thanh cong video sang chuan web H.264: {os.path.basename(video_path)}")
+        elif os.path.exists(tmp_converted):
+            os.remove(tmp_converted)
+    except Exception as e:
+        print(f"[!] Loi khi thuc hien chuyen doi video bang ffmpeg: {e}")
+        if os.path.exists(tmp_converted):
+            try:
+                os.remove(tmp_converted)
+            except Exception:
+                pass
+
+def _video_worker_loop():
+    global _is_converting
+    while True:
+        try:
+            video_path = _video_queue.get(timeout=1.0)
+        except queue.Empty:
+            if _stop_worker_signal:
+                break
+            continue
+
+        if video_path is None:
+            _video_queue.task_done()
+            break
+
+        _is_converting = True
+        try:
+            _process_single_video(video_path)
+        finally:
+            _is_converting = False
+            _video_queue.task_done()
+
+def _ensure_worker_started():
+    global _worker_thread
+    with _worker_lock:
+        if _worker_thread is None or not _worker_thread.is_alive():
+            _worker_thread = threading.Thread(target=_video_worker_loop, daemon=True, name="FFmpegWorker")
+            _worker_thread.start()
+
 def convert_video_to_h264_async(video_path):
     """
-    Tự động chuyển đổi video đã ghi sang chuẩn H.264 (+faststart) để tương thích 100% với trình duyệt web
+    Đưa video vào hàng đợi (Queue) để Worker chuyển đổi tuần tự sang H.264 (+faststart),
+    đảm bảo chỉ chạy tối đa 1 tiến trình ffmpeg tại 1 thời điểm, tránh tràn CPU/RAM.
     """
-    def _run():
-        if not os.path.exists(video_path):
-            return
+    if not video_path:
+        return
+    _ensure_worker_started()
+    _video_queue.put(video_path)
+    pending = _video_queue.qsize()
+    if pending > 1:
+        print(f"[*] Da dua video '{os.path.basename(video_path)}' vao hang doi chuyen doi H.264 (Dang cho: {pending} video).")
 
-        ffmpeg_bin = get_ffmpeg_path()
-        if not ffmpeg_bin:
-            print(f"[!] Canh bao: Khong tim thay ffmpeg.exe! Video '{os.path.basename(video_path)}' giu nguyen dinh dang goc.")
-            return
+def wait_for_video_converter(timeout=30):
+    """
+    Đợi Worker giải quyết nốt các video còn tồn trong hàng đợi trước khi tắt ứng dụng.
+    """
+    global _stop_worker_signal
+    total_pending = _video_queue.unfinished_tasks
+    if total_pending <= 0 and not _is_converting:
+        return
 
-        tmp_converted = video_path + ".h264.mp4"
-        cmd = [
-            ffmpeg_bin, '-y', '-i', video_path,
-            '-c:v', 'libx264', '-preset', 'ultrafast',
-            '-movflags', '+faststart',
-            tmp_converted
-        ]
+    print("\n" + "=" * 65)
+    print("  [*] Dang hoan tat luu cac video cuoi cung, vui long cho vai giay...")
+    print(f"      (Con lai: {total_pending} video can chuyen doi sang H.264)")
+    print("=" * 65)
 
-        creation_flags = 0
-        if sys.platform.startswith('win'):
-            creation_flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000)
+    start_t = time.time()
+    while _video_queue.unfinished_tasks > 0 or _is_converting:
+        if time.time() - start_t > timeout:
+            print("[!] Canh bao: Het thoi gian cho xu ly video, ung dung se dong.")
+            break
+        time.sleep(0.3)
 
-        try:
-            res = subprocess.run(
-                cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                creationflags=creation_flags
-            )
-            if res.returncode == 0 and os.path.exists(tmp_converted) and os.path.getsize(tmp_converted) > 1000:
-                os.replace(tmp_converted, video_path)
-                print(f"[*] Da chuyen doi thanh cong video sang chuan web H.264: {os.path.basename(video_path)}")
-            elif os.path.exists(tmp_converted):
-                os.remove(tmp_converted)
-        except Exception as e:
-            print(f"[!] Loi khi thuc hien chuyen doi video bang ffmpeg: {e}")
-            if os.path.exists(tmp_converted):
-                try:
-                    os.remove(tmp_converted)
-                except Exception:
-                    pass
-
-    threading.Thread(target=_run, daemon=True).start()
+    _stop_worker_signal = True
+    print("[*] Da hoan tat toan bo video trong hang doi.")
 
 def format_time_str(t, stream_type="webcam", base_dt=None):
     """

@@ -1,4 +1,4 @@
-// ===== KHỞI TẠO CANVAS VÙNG NGUY HIỂM (ROI) =====
+﻿// ===== KHỞI TẠO CANVAS VÙNG NGUY HIỂM (ROI) =====
 const canvas = document.getElementById('roi_canvas');
 const ctx = canvas ? canvas.getContext('2d') : null;
 const displayCanvas = document.getElementById('roi_display_canvas');
@@ -6,14 +6,42 @@ const displayCtx = displayCanvas ? displayCanvas.getContext('2d') : null;
 
 // ===== XỬ LÝ VÙNG NGUY HIỂM (ROI) =====
 function resizeCanvas() {
+    const mainImg = document.getElementById('main_preview');
     const camContainer = document.getElementById('cam_container');
-    const w = camContainer.clientWidth;
-    const h = camContainer.clientHeight;
-    if (w > 0 && h > 0) {
-        canvas.width = w;
-        canvas.height = h;
-        displayCanvas.width = w;
-        displayCanvas.height = h;
+    if (mainImg && mainImg.src && mainImg.clientWidth > 0 && mainImg.clientHeight > 0) {
+        const imgRect = mainImg.getBoundingClientRect();
+        const containerRect = camContainer.getBoundingClientRect();
+        const w = imgRect.width;
+        const h = imgRect.height;
+        const left = imgRect.left - containerRect.left;
+        const top = imgRect.top - containerRect.top;
+        [canvas, displayCanvas].forEach(c => {
+            if (c) {
+                c.width = w;
+                c.height = h;
+                c.style.width = w + 'px';
+                c.style.height = h + 'px';
+                c.style.left = left + 'px';
+                c.style.top = top + 'px';
+                c.style.right = 'auto';
+                c.style.bottom = 'auto';
+            }
+        });
+    } else if (camContainer) {
+        const w = camContainer.clientWidth;
+        const h = camContainer.clientHeight;
+        if (w > 0 && h > 0) {
+            [canvas, displayCanvas].forEach(c => {
+                if (c) {
+                    c.width = w;
+                    c.height = h;
+                    c.style.width = '100%';
+                    c.style.height = '100%';
+                    c.style.left = '0px';
+                    c.style.top = '0px';
+                }
+            });
+        }
     }
 }
 

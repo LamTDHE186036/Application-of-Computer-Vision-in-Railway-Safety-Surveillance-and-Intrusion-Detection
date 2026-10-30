@@ -1,4 +1,4 @@
-// ===== QUẢN LÝ GIÁM SÁT & CAMERA / VIDEO =====
+﻿// ===== QUẢN LÝ GIÁM SÁT & CAMERA / VIDEO =====
 
 // ===== HỆ THỐNG ÂM THANH CẢNH BÁO TỰ ĐỘNG =====
 const alertAudios = {
@@ -203,6 +203,14 @@ async function uploadVideoPreview(event) {
     const file = event.target.files[0];
     if (!file) return;
 
+    // Giới hạn kích thước tối đa 2 GB ngay ở phía trình duyệt
+    const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+        alert("Dung lượng video vượt quá giới hạn tối đa cho phép (2 GB)!\nVui lòng chọn tệp video có dung lượng nhỏ hơn.");
+        event.target.value = "";
+        return;
+    }
+
     if (isVideoStreamRunning) {
         isVideoStreamRunning = false;
         fetch('/stop_stream/video').catch(() => {});
@@ -216,6 +224,15 @@ async function uploadVideoPreview(event) {
 
     try {
         const res = await fetch('/upload_video', { method: 'POST', body: formData });
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            const errMsg = errData.message || (res.status === 413 ? "Dung lượng video vượt quá giới hạn (2 GB)!" : "Lỗi tải video.");
+            alert(errMsg);
+            if (statusText) statusText.innerText = errMsg;
+            event.target.value = "";
+            return;
+        }
+
         const data = await res.json();
 
         if (data.frame) {

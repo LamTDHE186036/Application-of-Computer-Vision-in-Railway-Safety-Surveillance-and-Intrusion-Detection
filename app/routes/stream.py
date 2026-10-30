@@ -21,7 +21,13 @@ def serve_audio(filename):
 
 @stream_bp.route('/upload_video', methods=['POST'])
 def upload_video():
+    if 'video' not in request.files:
+        return jsonify({"status": "error", "message": "Không tìm thấy file video trong yêu cầu tải lên."}), 400
+
     file = request.files['video']
+    if not file or file.filename == '':
+        return jsonify({"status": "error", "message": "Chưa chọn tệp video hoặc tên tệp không hợp lệ."}), 400
+
     file.save(config.TEMP_VIDEO_PATH)
     
     cap = cv2.VideoCapture(config.TEMP_VIDEO_PATH)

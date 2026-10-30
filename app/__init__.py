@@ -5,6 +5,12 @@ from app import config
 from app.routes import register_blueprints
 
 def cleanup_on_shutdown():
+    try:
+        from app.utils.video_utils import wait_for_video_converter
+        wait_for_video_converter()
+    except Exception:
+        pass
+
     if os.path.exists(config.TEMP_VIDEO_PATH):
         try:
             os.remove(config.TEMP_VIDEO_PATH)
@@ -32,6 +38,17 @@ def create_app():
         template_folder=template_dir,
         static_folder=static_dir
     )
+
+    # Giới hạn kích thước file tải lên tối đa 2 GB (khớp với thông báo giao diện)
+    app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024
+
+    @app.errorhandler(413)
+    def request_entity_too_large(error):
+        from flask import jsonify
+        return jsonify({
+            "status": "error",
+            "message": "Dung lượng video vượt quá giới hạn tối đa cho phép (2 GB)!"
+        }), 413
 
     # Đăng ký các route phân theo domain (stream, history, settings)
     register_blueprints(app)
