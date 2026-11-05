@@ -1,0 +1,7 @@
+Model,Dataset,Precision,Recall,mAP50,mAP50-95,Inference_ms,Validation_Time_s
+YOLO11s,roboflow_crossing,0.7598,0.4063,0.4403,0.268,67.77,15.36
+YOLO11s,rcd_ground,0.687,0.5451,0.5628,0.3777,71.47,15.74
+YOLO11s,rcd_elevated,0.7409,0.7148,0.731,0.4957,73.96,9.63
+YOLO26s,roboflow_crossing,0.799,0.3976,0.4422,0.2714,78.17,13.37
+YOLO26s,rcd_ground,0.8865,0.6117,0.714,0.4912,79.0,17.32
+YOLO26s,rcd_elevated,0.6995,0.6591,0.7008,0.4654,73.89,9.57

@@ -1,0 +1,4 @@
+Configuration,Device,Latency_ms,Median_ms,FPS,Speedup
+PyTorch Framework (.pt),Intel CPU,110.84,112.14,9.0,1.00x
+Intel OpenVINO (.xml),Intel CPU,228.79,225.07,4.4,0.48x
+Intel OpenVINO (.xml),Intel Iris Xe iGPU,27.11,26.79,36.9,4.09x

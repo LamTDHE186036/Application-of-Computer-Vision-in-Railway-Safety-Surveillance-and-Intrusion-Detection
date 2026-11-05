@@ -1,0 +1,59 @@
+# === Python & Bytecode ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+.ruff_cache/
+*.tmp
+
+# === Môi trường ảo (Virtual Environments) ===
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# === PyInstaller, Inno Setup & Đóng gói sản phẩm (Build & Dist) ===
+build/
+dist/
+Output/
+*.manifest
+*.pkg
+vc_redist.x64.exe
+VC_redist.x64.exe
+
+# === Dữ liệu runtime & Nhật ký vi phạm (Không đẩy video/log thực tế lên Git) ===
+data/recordings/*
+!data/recordings/.gitkeep
+data/intrusion_logs/*
+!data/intrusion_logs/.gitkeep
+temp_video.mp4
+*.h264.mp4
+*.log
+
+# === File nén và Dữ liệu lớn (GitHub giới hạn < 100MB) ===
+Dataset.zip
+Dataset_test/
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# === Thư mục đầu ra của YOLO / Thử nghiệm ===
+lichsu_video/
+lichsu_xampham/
+save_config/
+runs/
+
+# === IDE, Cấu hình cá nhân & OS ===
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store 
+Thumbs.db
+desktop.ini
+
+# === File hướng dẫn cá nhân (không đẩy lên Git) ===
+HUONG_DAN_GIT.md
