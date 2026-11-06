@@ -1,15 +1,20 @@
 """
 Thực nghiệm 3: Benchmark Tối ưu hóa Phần cứng & Tăng tốc Suy luận (Hardware Acceleration)
-So sánh hiệu năng suy luận mô hình nhận diện an toàn đường sắt YOLO:
+Mô hình sử dụng: duy nhất train-railway-yolo26s-all.pt và model_openvino
+Dữ liệu thử nghiệm: duy nhất video Dataset_test/test_exp.mp4
+So sánh hiệu năng suy luận:
 1. PyTorch Framework (.pt) thực thi trên Intel CPU
 2. Intel OpenVINO Toolkit (.xml/.bin) thực thi trên Intel CPU (Tối ưu AVX-512, Layer Fusion)
 3. Intel OpenVINO Toolkit thực thi trên Intel Iris Xe Graphics (iGPU)
 """
 
 import os
+import sys
 import time
 import argparse
+import cv2
 import numpy as np
+import pandas as pd
 from ultralytics import YOLO
 
 # Patch AutoBackend để Ultralytics nhận diện chuẩn thư mục OpenVINO
@@ -45,38 +50,54 @@ def get_hardware_info():
         info["error"] = str(e)
     return info
 
-def benchmark_single_target(model_path, device="cpu", num_frames=60, imgsz=640):
+def load_video_frames(video_path, num_frames=60):
     """
-    Đo đạc chi tiết độ trễ suy luận và FPS cho 1 cấu hình mô hình + thiết bị
+    Nạp trực tiếp chuỗi khung hình thực tế từ video phục vụ đo đạc hiệu năng suy luận
+    """
+    frames = []
+    if video_path and os.path.exists(video_path):
+        cap = cv2.VideoCapture(video_path)
+        while cap.isOpened() and len(frames) < num_frames:
+            ret, frame = cap.read()
+            if not ret or frame is None:
+                break
+            frames.append(frame)
+        cap.release()
+    return frames
+
+def benchmark_single_target(model_path, frames, device="cpu", imgsz=640):
+    """
+    Đo đạc chi tiết độ trễ suy luận và FPS cho 1 cấu hình mô hình + thiết bị trên các khung hình thực tế
     """
     if not os.path.exists(model_path):
+        print(f"[!] LỖI: Không tìm thấy mô hình tại: {model_path}")
         return None
 
     print(f"\n[*] Đang nạp mô hình: {os.path.basename(model_path)} (Device: {device})...")
     model = YOLO(model_path)
 
-    # Sinh frame giả lập ngẫu nhiên
-    dummy_frame = np.random.randint(0, 255, (imgsz, imgsz, 3), dtype=np.uint8)
+    warmup_frame = frames[0]
 
     # Warmup
     print(f"[*] Đang chạy khởi động (Warmup 10 frames)...")
     for _ in range(10):
-        _ = model(dummy_frame, verbose=False, device=device)
+        _ = model(warmup_frame, verbose=False, device=device, imgsz=imgsz)
 
     # Benchmark chính thức
-    print(f"[*] Đang thực hiện đo đạc ({num_frames} frames)...")
+    total_test = len(frames)
+    print(f"[*] Đang thực hiện đo đạc ({total_test} frames thực tế)...")
     latencies = []
-    for _ in range(num_frames):
+    for f in frames:
         t0 = time.perf_counter()
-        _ = model(dummy_frame, verbose=False, device=device)
+        _ = model(f, verbose=False, device=device, imgsz=imgsz)
         t1 = time.perf_counter()
         latencies.append((t1 - t0) * 1000) # milliseconds
 
-    avg_lat = float(np.mean(latencies))
-    med_lat = float(np.median(latencies))
-    min_lat = float(np.min(latencies))
-    max_lat = float(np.max(latencies))
-    p95_lat = float(np.percentile(latencies, 95))
+    avg_lat = float(np.mean(latencies)) if latencies else 0.0
+    med_lat = float(np.median(latencies)) if latencies else 0.0
+    min_lat = float(np.min(latencies)) if latencies else 0.0
+    max_lat = float(np.max(latencies)) if latencies else 0.0
+    p95_lat = float(np.percentile(latencies, 95)) if latencies else 0.0
     fps = 1000.0 / avg_lat if avg_lat > 0 else 0.0
 
     return {
@@ -88,21 +109,34 @@ def benchmark_single_target(model_path, device="cpu", num_frames=60, imgsz=640):
         "fps": round(fps, 1)
     }
 
-def run_hardware_benchmark(pt_path=None, ov_path=None, num_frames=60, imgsz=640):
+def run_hardware_benchmark(pt_path=None, ov_path=None, num_frames=60, imgsz=640, video_path=None):
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-    # Thiết lập đường dẫn mặc định nếu không truyền (Lấy mô hình hoàn thiện train_yolo26s_all)
+    # 1. Kiểm tra video duy nhất Dataset_test/test_exp.mp4
+    if not video_path:
+        video_path = os.path.join(base_dir, "Dataset_test", "test_exp.mp4")
+
+    if not os.path.exists(video_path):
+        print(f"[!] LỖI: Không tìm thấy video thực nghiệm tại: {video_path}")
+        return None
+
+    print(f"[*] Nạp video thực nghiệm: {video_path}")
+    test_frames = load_video_frames(video_path, num_frames=num_frames)
+    if len(test_frames) == 0:
+        print(f"[!] LỖI: Không đọc được khung hình nào từ video {video_path}!")
+        return None
+    print(f"[+] Đã đọc thành công {len(test_frames)} frames thực tế từ video.")
+
+    # 2. Kiểm tra mô hình duy nhất YOLO26s-all (PyTorch và OpenVINO)
     if not pt_path:
-        candidates = [
-            os.path.join(base_dir, "research", "finetune", "train_yolo26s_all", "train-railway-yolo26s-all.pt"),
-            os.path.join(base_dir, "models", "yolo26s", "model_pytorch", "train-railway-yolo26s-all.pt"),
-        ]
-        for c in candidates:
-            if os.path.exists(c):
-                pt_path = c
-                break
+        pt_path = os.path.join(base_dir, "models", "yolo26s", "model_pytorch", "train-railway-yolo26s-all.pt")
     if not ov_path:
         ov_path = os.path.join(base_dir, "models", "yolo26s", "model_openvino")
+
+    if not os.path.exists(pt_path):
+        print(f"[!] LỖI: Không tìm thấy mô hình PyTorch train-railway-yolo26s-all.pt tại: {pt_path}")
+    if not os.path.exists(ov_path):
+        print(f"[!] LỖI: Không tìm thấy thư mục mô hình OpenVINO tại: {ov_path}")
 
     hw_info = get_hardware_info()
 
@@ -113,7 +147,7 @@ def run_hardware_benchmark(pt_path=None, ov_path=None, num_frames=60, imgsz=640)
     print(f"[*] Bộ vi xử lý (CPU)     : {hw_info['cpu']}")
     print(f"[*] Bộ xử lý đồ họa (iGPU): {hw_info['gpu'] or 'Không tìm thấy iGPU'}")
     print(f"[*] Kích thước khung hình : {imgsz}x{imgsz}")
-    print(f"[*] Số khung hình đo đạc  : {num_frames} frames/cấu hình")
+    print(f"[*] Số khung hình đo đạc  : {len(test_frames)} frames/cấu hình")
     print("=" * 80)
 
     results = {}
@@ -121,14 +155,14 @@ def run_hardware_benchmark(pt_path=None, ov_path=None, num_frames=60, imgsz=640)
     # 1. Đo lường PyTorch CPU
     if os.path.exists(pt_path):
         print("\n>>> [1/3] Đo lường PyTorch Baseline trên CPU...")
-        results["pytorch_cpu"] = benchmark_single_target(pt_path, device="cpu", num_frames=num_frames, imgsz=imgsz)
+        results["pytorch_cpu"] = benchmark_single_target(pt_path, frames=test_frames, device="cpu", imgsz=imgsz)
     else:
         print(f"[!] Bỏ qua PyTorch CPU (Không tìm thấy: {pt_path})")
 
     # 2. Đo lường OpenVINO CPU
     if os.path.exists(ov_path):
         print("\n>>> [2/3] Đo lường Intel OpenVINO trên CPU (Tối ưu AVX-512 & Layer Fusion)...")
-        results["openvino_cpu"] = benchmark_single_target(ov_path, device="cpu", num_frames=num_frames, imgsz=imgsz)
+        results["openvino_cpu"] = benchmark_single_target(ov_path, frames=test_frames, device="cpu", imgsz=imgsz)
     else:
         print(f"[!] Bỏ qua OpenVINO CPU (Không tìm thấy: {ov_path})")
 
@@ -136,12 +170,11 @@ def run_hardware_benchmark(pt_path=None, ov_path=None, num_frames=60, imgsz=640)
     if os.path.exists(ov_path) and hw_info["has_ov_gpu"]:
         print("\n>>> [3/3] Đo lường Intel OpenVINO trên Intel Iris Xe iGPU...")
         try:
-            results["openvino_gpu"] = benchmark_single_target(ov_path, device="intel:gpu", num_frames=num_frames, imgsz=imgsz)
+            results["openvino_gpu"] = benchmark_single_target(ov_path, frames=test_frames, device="intel:gpu", imgsz=imgsz)
         except Exception as e:
             print(f"[!] Lỗi khi đo trên GPU: {e}")
-            # Thử device=GPU
             try:
-                results["openvino_gpu"] = benchmark_single_target(ov_path, device="GPU", num_frames=num_frames, imgsz=imgsz)
+                results["openvino_gpu"] = benchmark_single_target(ov_path, frames=test_frames, device="GPU", imgsz=imgsz)
             except Exception as e2:
                 print(f"[!] Thử lại với device='GPU' thất bại: {e2}")
 
@@ -170,12 +203,11 @@ def run_hardware_benchmark(pt_path=None, ov_path=None, num_frames=60, imgsz=640)
 
     print("=" * 90)
 
-    # 4. Tự động lưu bảng kết quả vào thư mục results/
+    # Tự động lưu bảng kết quả vào thư mục results/
     results_dir = os.path.join(os.path.dirname(__file__), "results")
     os.makedirs(results_dir, exist_ok=True)
     csv_path = os.path.join(results_dir, "hardware_benchmark.csv")
 
-    import pandas as pd
     rows = []
     if "pytorch_cpu" in results and results["pytorch_cpu"]:
         r = results["pytorch_cpu"]
@@ -198,11 +230,11 @@ def run_hardware_benchmark(pt_path=None, ov_path=None, num_frames=60, imgsz=640)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Đo đạc tăng tốc phần cứng PyTorch vs OpenVINO")
-    parser.add_argument("--pt", type=str, default="", help="Đường dẫn file .pt")
-    parser.add_argument("--ov", type=str, default="", help="Đường dẫn thư mục OpenVINO")
+    parser.add_argument("--pt", type=str, default="", help="Đường dẫn file .pt của YOLO26s-all")
+    parser.add_argument("--ov", type=str, default="", help="Đường dẫn thư mục OpenVINO của YOLO26s-all")
+    parser.add_argument("--video", type=str, default="", help="Đường dẫn file video thực nghiệm (mặc định Dataset_test/test_exp.mp4)")
     parser.add_argument("--frames", type=int, default=50, help="Số khung hình đo")
     parser.add_argument("--imgsz", type=int, default=640, help="Kích thước ảnh")
     args = parser.parse_args()
 
-    run_hardware_benchmark(pt_path=args.pt, ov_path=args.ov, num_frames=args.frames, imgsz=args.imgsz)
-
+    run_hardware_benchmark(pt_path=args.pt, ov_path=args.ov, num_frames=args.frames, imgsz=args.imgsz, video_path=args.video)

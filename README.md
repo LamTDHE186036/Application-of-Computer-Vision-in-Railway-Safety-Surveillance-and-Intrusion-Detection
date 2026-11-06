@@ -313,7 +313,7 @@ Tất cả các tệp cấu hình được đặt trong thư mục `configs/` đ
 
 ## 👥 Tác Giả & Bản Quyền (Credits & License)
 
-- **Học viên thực hiện:** Trần Đăng Lâm (Mã học viên: HE186036)
+- **Học viên thực hiện:** Trần Đại Lâm (Mã học viên: HE186036)
 - **Đề tài tốt nghiệp:** Ứng dụng Thị giác máy tính trong Giám sát An toàn và Cảnh báo Xâm phạm Đường ngang Đường sắt.
 - **Kho lưu trữ GitHub:** [Application-of-Computer-Vision-in-Railway-Safety-Surveillance-and-Intrusion-Detection](https://github.com/LamTDHE186036/Application-of-Computer-Vision-in-Railway-Safety-Surveillance-and-Intrusion-Detection.git)
 - **Mục đích:** Phục vụ học tập, nghiên cứu khoa học và phát triển ứng dụng công nghệ giao thông thông minh.

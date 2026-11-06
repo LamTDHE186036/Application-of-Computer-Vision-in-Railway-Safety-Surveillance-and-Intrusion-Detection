@@ -1,5 +1,7 @@
 """
 Thực nghiệm 2: Đánh giá & So sánh Giải thuật Tracking đa đối tượng (MOT)
+Mô hình sử dụng: duy nhất train-railway-yolo26s-all.pt
+Dữ liệu thử nghiệm: duy nhất video Dataset_test/test_exp.mp4
 So sánh 3 phương pháp:
 1. No Tracking (Chỉ sử dụng YOLO Detection thuần)
 2. BoT-SORT / DeepSORT (Tracking kết hợp Re-ID ngoại hình & Kalman Filter)
@@ -7,58 +9,23 @@ So sánh 3 phương pháp:
 """
 
 import os
+import sys
 import time
 import argparse
 import numpy as np
 import cv2
+import pandas as pd
 from ultralytics import YOLO
-
-def generate_synthetic_crossing_scenario(num_frames=120, width=640, height=480):
-    """
-    Tạo chuỗi video mô phỏng phương tiện/người đi qua khu vực đường ray:
-    - 2 người đi bộ băng qua đường sắt với vận tốc khác nhau.
-    - Có hiện tượng che khuất chéo nhau (Occlusion) ở khoảng frame 50-70.
-    """
-    frames = []
-    # Định nghĩa 2 vật thể chuyển động (vẽ dạng hộp có vân để detector nhận diện nếu cần)
-    for f in range(num_frames):
-        img = np.full((height, width, 3), 40, dtype=np.uint8)
-        # Vẽ đường ray giả lập
-        cv2.line(img, (0, 300), (width, 300), (100, 100, 100), 4)
-        cv2.line(img, (0, 340), (width, 340), (100, 100, 100), 4)
-        for tie_x in range(0, width, 30):
-            cv2.line(img, (tie_x, 290), (tie_x, 350), (70, 70, 70), 2)
-            
-        # Đối tượng 1 (Person 1: Đi từ trái sang phải)
-        p1_x = int(50 + f * 4.5)
-        p1_y = 260
-        if 0 <= p1_x < width - 40:
-            cv2.rectangle(img, (p1_x, p1_y), (p1_x + 35, p1_y + 80), (0, 180, 255), -1)
-            cv2.putText(img, "P1", (p1_x, p1_y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-
-        # Đối tượng 2 (Person 2: Đi từ phải sang trái, cắt mặt P1 ở giữa)
-        p2_x = int(550 - f * 4.0)
-        p2_y = 270
-        if 0 <= p2_x < width - 40:
-            cv2.rectangle(img, (p2_x, p2_y), (p2_x + 35, p2_y + 75), (255, 100, 0), -1)
-            cv2.putText(img, "P2", (p2_x, p2_y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-
-        frames.append(img)
-    return frames
 
 def evaluate_tracking_mode(model_path, mode, frames, tracker_cfg=None):
     """
-    Đo đạc hiệu năng của một chế độ tracking:
-    - FPS trung bình
-    - Latency mỗi frame (ms)
-    - Số lượng unique IDs được sinh ra
-    - Số lần chuyển đổi ID (ID Switches ước lượng)
-    - Khả năng tích lũy Dwell Time
+    Đo đạc hiệu năng của một chế độ tracking trên chuỗi khung hình thực tế
     """
     model = YOLO(model_path)
     latencies = []
     ids_per_frame = []
     unique_ids = set()
+    dwell_counter = {}
 
     # Reset predictor tracker state nếu có
     if hasattr(model, 'predictor') and hasattr(model.predictor, 'trackers'):
@@ -107,7 +74,7 @@ def evaluate_tracking_mode(model_path, mode, frames, tracker_cfg=None):
                         dwell_counter[tid] = f_idx
             ids_per_frame.append(current_frame_ids)
 
-    avg_latency = float(np.mean(latencies))
+    avg_latency = float(np.mean(latencies)) if latencies else 0.0
     fps = 1000.0 / avg_latency if avg_latency > 0 else 0.0
 
     return {
@@ -125,39 +92,41 @@ def run_experiment(video_path=None, model_path=None, num_frames=100):
     print(" Hệ thống Giám sát An toàn Đường sắt & Phát hiện Xâm nhập")
     print("=" * 70)
 
-    # 1. Chuẩn bị mô hình (Lấy mô hình hoàn thiện train_yolo26s_all đã thêm lớp tàu)
-    if not model_path:
-        candidates = [
-            "research/finetune/train_yolo26s_all/train-railway-yolo26s-all.pt",
-            "models/yolo26s/model_pytorch/train-railway-yolo26s-all.pt",
-            "research/finetune/train_yolo26s/train-railway-yolo26s.pt"
-        ]
-        for c in candidates:
-            if os.path.exists(c):
-                model_path = c
-                break
-        if not model_path:
-            model_path = "yolo11s.pt"
-    print(f"[*] Mô hình sử dụng đánh giá Tracking: {model_path}")
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-    # 2. Chuẩn bị frames
+    # 1. Kiểm tra mô hình duy nhất YOLO26s-all
+    if not model_path:
+        model_path = os.path.join(base_dir, "models", "yolo26s", "model_pytorch", "train-railway-yolo26s-all.pt")
+
+    if not os.path.exists(model_path):
+        print(f"[!] LỖI: Không tìm thấy mô hình train-railway-yolo26s-all.pt tại: {model_path}")
+        return None
+    print(f"[*] Mô hình sử dụng: {model_path}")
+
+    # 2. Kiểm tra video duy nhất Dataset_test/test_exp.mp4
+    if not video_path:
+        video_path = os.path.join(base_dir, "Dataset_test", "test_exp.mp4")
+
+    if not os.path.exists(video_path):
+        print(f"[!] LỖI: Không tìm thấy video thực nghiệm tại: {video_path}")
+        return None
+
+    print(f"[*] Nạp video thực nghiệm: {video_path}")
+    cap = cv2.VideoCapture(video_path)
     frames = []
-    if video_path and os.path.exists(video_path):
-        print(f"[*] Nạp video thực nghiệm: {video_path}")
-        cap = cv2.VideoCapture(video_path)
-        count = 0
-        while cap.isOpened() and count < num_frames:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            frames.append(frame)
-            count += 1
-        cap.release()
-        print(f"[+] Đã đọc {len(frames)} frames từ video.")
-    else:
-        print(f"[*] Không có file video chỉ định, tạo chuỗi mô phỏng cắt ngang đường sắt (Synthetic crossing sequence)...")
-        frames = generate_synthetic_crossing_scenario(num_frames=num_frames)
-        print(f"[+] Đã khởi tạo {len(frames)} frames mô phỏng.")
+    count = 0
+    while cap.isOpened() and count < num_frames:
+        ret, frame = cap.read()
+        if not ret or frame is None:
+            break
+        frames.append(frame)
+        count += 1
+    cap.release()
+
+    if len(frames) == 0:
+        print(f"[!] LỖI: Không đọc được khung hình nào từ video {video_path}!")
+        return None
+    print(f"[+] Đã đọc thành công {len(frames)} khung hình từ video.")
 
     # 3. Chạy đánh giá qua 3 giải thuật
     tracker_cfg = os.path.join(os.path.dirname(__file__), "bytetrack.yaml")
@@ -187,7 +156,6 @@ def run_experiment(video_path=None, model_path=None, num_frames=100):
     os.makedirs(results_dir, exist_ok=True)
     csv_path = os.path.join(results_dir, "tracker_comparison.csv")
     
-    import pandas as pd
     df = pd.DataFrame([
         {"Method": "Pure YOLO (No Tracking)", "Latency_ms": res_none["avg_latency_ms"], "FPS": res_none["fps"], "Dwell_Support": res_none["dwell_support"], "Overhead_ms": res_none["overhead_ms"]},
         {"Method": "BoT-SORT / DeepSORT", "Latency_ms": res_botsort["avg_latency_ms"], "FPS": res_botsort["fps"], "Dwell_Support": res_botsort["dwell_support"], "Overhead_ms": res_botsort["overhead_ms"]},
@@ -200,10 +168,9 @@ def run_experiment(video_path=None, model_path=None, num_frames=100):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Đánh giá & so sánh giải thuật Tracking MOT")
-    parser.add_argument("--video", type=str, default="", help="Đường dẫn file video đầu vào")
-    parser.add_argument("--model", type=str, default="", help="Đường dẫn mô hình YOLO")
+    parser.add_argument("--video", type=str, default="", help="Đường dẫn file video đầu vào (mặc định Dataset_test/test_exp.mp4)")
+    parser.add_argument("--model", type=str, default="", help="Đường dẫn mô hình YOLO26s-all")
     parser.add_argument("--frames", type=int, default=80, help="Số frame thực nghiệm")
     args = parser.parse_args()
 
     run_experiment(video_path=args.video, model_path=args.model, num_frames=args.frames)
-

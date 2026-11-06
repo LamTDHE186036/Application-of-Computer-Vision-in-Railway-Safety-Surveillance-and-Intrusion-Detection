@@ -1,4 +1,4 @@
 Method,Latency_ms,FPS,Dwell_Support,Overhead_ms
-Pure YOLO (No Tracking),250.0,4.0,Không thể đo (Mất ID liên tục),-2320.52
-BoT-SORT / DeepSORT,102.81,9.7,Khả thi (Duy trì ID chính xác),-134.25
-ByteTrack (De xuat),107.78,9.3,Khả thi (Duy trì ID chính xác),-151.83
+Pure YOLO (No Tracking),559.38,1.8,Không thể đo (Mất ID liên tục),-1837.87
+BoT-SORT / DeepSORT,121.99,8.2,Khả thi (Duy trì ID chính xác),-117.52
+ByteTrack (De xuat),106.94,9.4,Khả thi (Duy trì ID chính xác),-71.47
