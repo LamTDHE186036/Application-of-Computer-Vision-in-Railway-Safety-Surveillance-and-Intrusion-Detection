@@ -1,8 +1,8 @@
 """
-Thực nghiệm 1: Đánh giá & So sánh Kiến trúc Mô hình Nhận diện (YOLO11s vs YOLO26s)
-So sánh 2 mô hình đã finetune trên tập dữ liệu an toàn đường sắt:
-1. YOLO11s (Trọng số: research/finetune/train_yolo11s/train-railway-yolo11s.pt)
-2. YOLO26s (Trọng số: research/finetune/train_yolo26s/train-railway-yolo26s.pt)
+Thực nghiệm 1: Đánh giá & So sánh Kiến trúc Mô hình Nhận diện (YOLO11s-all vs YOLO26s-all)
+So sánh 2 mô hình đã finetune toàn diện (5 classes) trên tập dữ liệu an toàn đường sắt:
+1. YOLO11s_all (Trọng số: research/finetune/train_yolo11s_all/train-railway-yolo11s-all.pt)
+2. YOLO26s_all (Trọng số: research/finetune/train_yolo26s_all/train-railway-yolo26s-all.pt)
 
 Đánh giá chéo trên 3 tập dữ liệu kiểm thử độc lập tại Dataset_test:
 - Dataset_test/roboflow_crossing/data.yaml (Đường ngang giao cắt)
@@ -22,8 +22,8 @@ EXP1_DIR = os.path.abspath(os.path.dirname(__file__))
 RESULTS_DIR = os.path.join(EXP1_DIR, "results")
 
 MODELS = {
-    "YOLO11s": os.path.join(BASE_DIR, "research", "finetune", "train_yolo11s", "train-railway-yolo11s.pt"),
-    "YOLO26s": os.path.join(BASE_DIR, "research", "finetune", "train_yolo26s", "train-railway-yolo26s.pt")
+    "YOLO11s_all": os.path.join(BASE_DIR, "research", "finetune", "train_yolo11s_all", "train-railway-yolo11s-all.pt"),
+    "YOLO26s_all": os.path.join(BASE_DIR, "research", "finetune", "train_yolo26s_all", "train-railway-yolo26s-all.pt")
 }
 
 DATASETS = {
@@ -32,18 +32,16 @@ DATASETS = {
     "rcd_elevated": os.path.join(BASE_DIR, "Dataset_test", "rcd_elevated", "data.yaml")
 }
 
-CLASS_NAMES = ["car", "motorcycle", "person", "truck-bus"]
-
 def run_evaluation(batch_size=8, imgsz=640, device="cpu"):
     """
-    Thực thi validation trực tiếp trên Dataset_test cho YOLO11s và YOLO26s
+    Thực thi validation trực tiếp trên Dataset_test cho YOLO11s_all và YOLO26s_all
     """
     os.makedirs(RESULTS_DIR, exist_ok=True)
     summary_rows = []
     class_rows = []
 
     print("=" * 80)
-    print(" THỰC NGHIỆM 1: ĐÁNH GIÁ ĐỐI ĐẦU YOLO11s VS YOLO26s TRÊN DATASET_TEST")
+    print(" THỰC NGHIỆM 1: ĐÁNH GIÁ ĐỐI ĐẦU YOLO11s-ALL VS YOLO26s-ALL TRÊN DATASET_TEST")
     print(f"[*] Thiết bị suy luận : {device}")
     print(f"[*] Kích thước ảnh    : {imgsz}x{imgsz}")
     print(f"[*] Kích thước batch  : {batch_size}")
@@ -99,7 +97,8 @@ def run_evaluation(batch_size=8, imgsz=640, device="cpu"):
 
             # Lấy chỉ số chi tiết theo từng lớp (Per-class)
             maps_per_class = val_results.box.maps
-            for c_idx, c_name in enumerate(CLASS_NAMES):
+            dataset_classes = val_results.names
+            for c_idx, c_name in dataset_classes.items():
                 c_map50 = float(maps_per_class[c_idx]) if c_idx < len(maps_per_class) else 0.0
                 class_rows.append({
                     "Model": model_name,
@@ -155,14 +154,14 @@ def display_saved_results():
 
     df_avg = pd.read_csv(avg_csv)
     print("=" * 90)
-    print(" KẾT QUẢ SO SÁNH TRUNG BÌNH ĐÃ LƯU (YOLO11s VS YOLO26s)")
+    print(" KẾT QUẢ SO SÁNH TRUNG BÌNH ĐÃ LƯU (YOLO11s-ALL VS YOLO26s-ALL)")
     print("=" * 90)
     print(df_avg.to_string(index=False))
     print("=" * 90)
     return pd.read_csv(summary_csv), df_avg
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="So sánh YOLO11s vs YOLO26s trên Dataset_test")
+    parser = argparse.ArgumentParser(description="So sánh YOLO11s-all vs YOLO26s-all trên Dataset_test")
     parser.add_argument("--eval", action="store_true", help="Chạy lại toàn bộ quá trình validation trên Dataset_test")
     parser.add_argument("--batch", type=int, default=8, help="Kích thước batch")
     parser.add_argument("--device", type=str, default="cpu", help="Thiết bị thực thi (cpu, 0, intel:gpu)")
