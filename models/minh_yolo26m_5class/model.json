@@ -1,0 +1,39 @@
+{
+  "file": "yolo26m-5class-finetuned.pt",
+  "sha256": "b62e7ca4059b46d1a0345a7ef3c479918f045f14a9785c526052450f11ed1385",
+  "names": [
+    "person",
+    "two_wheeler",
+    "large_vehicle",
+    "car",
+    "train"
+  ],
+  "ultralytics": "8.4.161",
+  "architecture": "YOLO26m",
+  "task": "detect",
+  "selected_epoch": 3,
+  "source_sha256": "2b100b32afe7d37cf21770ce38ecc0db8340e1caafef92ce8afc3b4d1eac923c",
+  "inference_defaults": {
+    "imgsz": 640,
+    "conf": 0.5,
+    "nms": false,
+    "quantize": 32
+  },
+  "native_to_repository_class_id": {
+    "0": 2,
+    "1": 1,
+    "2": 3,
+    "3": 0,
+    "4": 4
+  },
+  "native_to_repository_label": {
+    "person": "person",
+    "two_wheeler": "motorcycle",
+    "large_vehicle": "truck-bus",
+    "car": "car",
+    "train": "train"
+  },
+  "exported_tensors": 768,
+  "all_tensors_exactly_equal": true,
+  "inference_only": true
+}
