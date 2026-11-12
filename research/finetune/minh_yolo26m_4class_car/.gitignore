@@ -1,0 +1,8 @@
+runs/
+inputs/
+models/
+.settings/
+.venv/
+__pycache__/
+Ultralytics/
+*.pt

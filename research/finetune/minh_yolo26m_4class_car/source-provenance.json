@@ -1,0 +1,19 @@
+{
+  "source_files": {
+    "finetune_that_ai.py": "478a7cb230a57755352b04f7f2a28ceed38fd46f09eef26b17e4c36e45d2b3d3",
+    "finetune_5_lop.py": "3b66483c94bcfc2bb75182611602600ad01b38450fca0279a3e678e967b559dc",
+    "railway_five_class.py": "0cce10b8bfdc1b03fa4a7adced8b58c11d01176b3bd04dd17f944a4bba4d349c",
+    "spatial_ignore.py": "4830662a4839f96df83ba29f9be8a10def69703af2e11b1c33006515d4c10856",
+    "verify_spatial_ignore.py": "e7e3340f81b169b90a7aca2a0a1f947978348764d8f4334ba0e6d3ffbf4f173e",
+    "export_portable_car.py": "6f617053b8ab549b7695aecfbc05aabafdef6706c6c1fcc2978bede6c6d69566",
+    "prepare_car_four_class.py": "dda2dcd62cf994db754e5506caf08838099d669ae08d30a2fdb531b547c47007"
+  },
+  "changes": "CLI input/output paths, optional local Python environment, preselected data archive support, and removal of an unrelated experiment helper dependency; training recipe and mathematical model/loss/export operations retained. Preflight fixture retains only the original masked-box coordinates when the shared data archive omits review history.",
+  "published_checkpoint": "models/minh_yolo26m_4class_car/yolo26m-4class-car.pt",
+  "published_sha256": "9d8d2ca82c0c8eb1ea60e0eaa7da15f31d968b51205b40aa9483b78c5bac9e9a",
+  "lineage": [
+    "Four original road classes: train 700 real + 700 synthetic, 125 validation, classifier-only",
+    "Five classes: continue four-class checkpoint, add train, preserve features/boxes, partial/spatial-ignore loss",
+    "Four merged classes: export max(large_vehicle,car) using built-in modules; no optimizer steps"
+  ]
+}

@@ -2,6 +2,8 @@
 
 Checkpoint suy luận độc lập: **`yolo26m-4class-car.pt`**. Nạp trực tiếp bằng Ultralytics; không cần `layers.py`, `inference.py` hoặc module Python riêng của dự án nghiên cứu.
 
+[Code fine-tune, xử lý nhãn và gộp/xuất checkpoint](../../research/finetune/minh_yolo26m_4class_car/README.md) nằm riêng trong `research/`; không cần các file đó để suy luận bằng checkpoint cuối.
+
 ## Nhãn đầu ra
 
 | ID | Tên trong model | Phạm vi |
