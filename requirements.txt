@@ -1,0 +1,8 @@
+flask>=2.0.0
+ultralytics>=8.0.0
+opencv-python>=4.8.0
+openvino>=2024.0.0
+numpy
+torch
+pandas
+imageio-ffmpeg

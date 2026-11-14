@@ -1,0 +1,6 @@
+{
+  "conf": 0.25,
+  "dwell_time": 5.0,
+  "train_mode": "train_approaching",
+  "obs_cam": "0"
+}

@@ -1,0 +1,8 @@
+{
+  "classes": [
+    "person",
+    "car",
+    "motorcycle",
+    "truck-bus"
+  ]
+}
