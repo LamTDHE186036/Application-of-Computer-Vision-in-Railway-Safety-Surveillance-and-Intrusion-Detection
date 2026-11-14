@@ -2,7 +2,7 @@
 
 `yolo26m-4class-standard.pt` là checkpoint `best.pt` được chọn ở epoch 48 theo validation trong lượt train đủ 50 epoch ngày 13–14/11/2026. Model học trực tiếp bốn lớp từ YOLO26m pretrained COCO bằng Ultralytics 8.4.161.
 
-[Code fine-tune và cách chạy lại](../../research/finetune/minh_yolo26m_4class_standard/README.md).
+[Train YOLO26m](../../research/finetune/yolo26m/README.md).
 
 | ID | Nhãn | Phạm vi |
 |---:|---|---|
