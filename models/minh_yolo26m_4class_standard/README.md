@@ -25,7 +25,7 @@ results = model.predict(frame, imgsz=640, device="cpu", verbose=False)
 | Validation | 200 | 84,08% | 62,61% |
 | Test nội bộ | 200 | 69,20% | 47,21% |
 
-Tập train có 1.600 ảnh. Các điểm trên đo nhận diện, còn tracking và cảnh báo cần kiểm tra trên video. Trên cùng 200 ảnh test nội bộ, model web của Minh đạt 62,30% mAP50–95 sau khi quy về cùng bốn lớp. Trong đó có 142 ảnh từng dùng để train model web. Các tập ảnh dùng nhãn hiện có với mức rà soát khác nhau.
+Tập train có 1.600 ảnh. Các điểm trên đo nhận diện, còn tracking và cảnh báo cần kiểm tra trên video. Các tập ảnh dùng nhãn hiện có với mức rà soát khác nhau.
 
 SHA-256 của `yolo26m-4class-standard.pt`:
 
