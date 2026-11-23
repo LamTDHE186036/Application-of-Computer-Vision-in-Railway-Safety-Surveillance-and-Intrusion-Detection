@@ -28,7 +28,6 @@ function switchMainView(viewName) {
         if (viewMonitor) viewMonitor.style.display = 'none';
         if (viewHistory) {
             viewHistory.style.display = 'flex';
-            viewHistory.classList.add('active');
         }
         updateHistoryLiveStatus();
         initHistoryView();
@@ -37,11 +36,9 @@ function switchMainView(viewName) {
         if (btnMonitor) btnMonitor.classList.add('active');
         if (viewHistory) {
             viewHistory.style.display = 'none';
-            viewHistory.classList.remove('active');
         }
         if (viewMonitor) {
             viewMonitor.style.display = 'grid';
-            viewMonitor.classList.add('active');
         }
         // Dừng video lịch sử nếu đang phát để không lẫn âm thanh
         const videoEl = document.getElementById('history_video_element');
@@ -113,35 +110,12 @@ function applyHistoryFilter() {
     if (currentClassFilter === 'all') {
         filteredHistoryEvents = [...historyEventsData];
     } else {
+        const filter = currentClassFilter.trim().toLowerCase();
         filteredHistoryEvents = historyEventsData.filter(ev => {
-            const name = (ev.object_name || '').toLowerCase();
-            const filter = currentClassFilter.toLowerCase();
-
-            // Nhóm Xe máy
-            if (filter.includes('máy') || filter.includes('motorcycle')) {
-                return name.includes('máy') || name.includes('motorcycle');
-            }
-            // Nhóm Người
-            if (filter.includes('người') || filter.includes('person') || filter.includes('nguoi')) {
-                return name.includes('người') || name.includes('person') || name.includes('nguoi');
-            }
-            // Nhóm Xe tải / Xe buýt
-            if (filter.includes('tải') || filter.includes('buýt') || filter.includes('truck') || filter.includes('bus')) {
-                return name.includes('tải') || name.includes('buýt') || name.includes('truck') || name.includes('bus');
-            }
-            // Nhóm Ô tô
-            if (filter.includes('ô tô') || filter.includes('o to') || filter.includes('car')) {
-                return (name.includes('ô tô') || name.includes('o to') || name.includes('car')) && !name.includes('tải') && !name.includes('buýt');
-            }
-
-            return name.includes(filter) || filter.includes(name);
+            return (ev.object_name || '').trim().toLowerCase() === filter;
         });
     }
     renderHistoryEvents();
-}
-
-async function reloadHistoryEvents() {
-    await initHistoryView();
 }
 
 async function loadHistoryEvents(dateStr) {
@@ -741,7 +715,6 @@ function toggleHistoryVideoPlay() {
         const slider = document.getElementById('history_timeline_slider');
         const icon = document.getElementById('icon_history_play');
         if (fallbackIsPlaying) {
-            fallbackIsPlaying = false;
             stopFallbackTimer();
             streamImg.src = '';
             if (icon) icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
@@ -859,7 +832,6 @@ const vscObserver = new MutationObserver((mutations) => {
 
 try {
     vscObserver.observe(document.documentElement || document.body, { childList: true, subtree: true });
+    removeExtensionOverlays();
 } catch (_) {}
-
-setInterval(removeExtensionOverlays, 1000);
 

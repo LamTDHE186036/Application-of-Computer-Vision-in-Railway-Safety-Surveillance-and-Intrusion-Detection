@@ -70,30 +70,6 @@ function openSettingsModal() {
     modal.classList.add('active');
 }
 
-// Tự động tải danh sách camera và gán sự kiện đổi camera tức thì
-document.addEventListener('DOMContentLoaded', () => {
-    loadCamerasList();
-    const camSelect = document.getElementById('modal_obs_cam_select');
-    if (camSelect) {
-        camSelect.addEventListener('change', async () => {
-            const val = camSelect.value;
-            currentObsCam = val;
-            try {
-                await fetch('/set_settings', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ obs_cam: val })
-                });
-                if (typeof refreshObsCameraInfo === 'function') {
-                    refreshObsCameraInfo();
-                }
-            } catch (err) {
-                console.warn("Lỗi lưu camera khi thay đổi:", err);
-            }
-        });
-    }
-});
-
 function closeSettingsModal() {
     const modal = document.getElementById('settings_modal');
     if (modal) modal.classList.remove('active');

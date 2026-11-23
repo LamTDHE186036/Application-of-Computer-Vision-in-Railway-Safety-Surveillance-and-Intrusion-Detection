@@ -89,9 +89,6 @@ def get_data(stream_type):
 
 @stream_bp.route('/get_events', methods=['GET'])
 def get_events():
-    import datetime
     return jsonify({
-        "status": "success",
-        "date": datetime.datetime.now().strftime("%d-%m-%Y"),
         "text": detector.generate_html()
     })

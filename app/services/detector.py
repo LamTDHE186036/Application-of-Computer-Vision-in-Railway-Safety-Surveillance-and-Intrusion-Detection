@@ -64,36 +64,9 @@ def check_system_resources():
     except Exception:
         pass
 
-    ram_gb = 0.0
-    try:
-        import psutil
-        ram_gb = psutil.virtual_memory().total / (1024 ** 3)
-    except Exception:
-        try:
-            import ctypes
-            class MEMORYSTATUSEX(ctypes.Structure):
-                _fields_ = [
-                    ("dwLength", ctypes.c_ulong),
-                    ("dwMemoryLoad", ctypes.c_ulong),
-                    ("ullTotalPhys", ctypes.c_ulonglong),
-                    ("ullAvailPhys", ctypes.c_ulonglong),
-                    ("ullTotalPageFile", ctypes.c_ulonglong),
-                    ("ullAvailPageFile", ctypes.c_ulonglong),
-                    ("ullTotalVirtual", ctypes.c_ulonglong),
-                    ("ullAvailVirtual", ctypes.c_ulonglong),
-                    ("sullAvailExtendedVirtual", ctypes.c_ulonglong),
-                ]
-            stat = MEMORYSTATUSEX()
-            stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
-            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
-            ram_gb = stat.ullTotalPhys / (1024 ** 3)
-        except Exception:
-            ram_gb = 8.0
-
     return {
         "has_gpu": has_gpu,
-        "gpu_name": gpu_name,
-        "ram_gb": round(ram_gb, 1)
+        "gpu_name": gpu_name
     }
 
 # --- NẠP MÔ HÌNH YOLO26s ---
@@ -107,7 +80,6 @@ def load_yolo_model():
     print("=" * 75)
     print(" HỆ THỐNG PHÂN TÍCH TÀI NGUYÊN & KHỞI ĐỘNG MÔ HÌNH YOLO26s")
     print(f"[*] Card đồ họa rời (NVIDIA GPU) : {res_info['gpu_name'] if res_info['has_gpu'] else 'Không có (Dùng Intel iGPU / CPU)'}")
-    print(f"[*] Tổng dung lượng RAM hệ thống : {res_info['ram_gb']} GB")
     print("[*] Mô hình kích hoạt           : YOLO26s (Mô hình phát hiện vi phạm đường sắt)")
     print("=" * 75)
 
@@ -231,16 +203,14 @@ def load_today_events():
             for line in lines:
                 match = re.search(r'(?:(\d{2}-\d{2}-\d{4})\s+)?(\d{2}:\d{2}:\d{2})\s*-\s*(\d{2}:\d{2}:\d{2}):\s*(.*?)\s*\(ID\s*(.*?)\)\s*(.*)', line)
                 if match:
-                    _, start, end, name, tid, desc = match.groups()
-                    completed_events.insert(0, {"id": tid, "name": name, "start": start, "end": end, "desc": desc.strip()})
+                    _, start, end, name, _tid, desc = match.groups()
+                    completed_events.insert(0, {"name": name, "start": start, "end": end, "desc": desc.strip()})
 
 def check_day_transition():
     """Kiểm tra và tự động chuyển ngày mới (qua nửa đêm)"""
     now_date = datetime.datetime.now().strftime("%d-%m-%Y")
     if now_date != current_date_str:
         load_today_events()
-        return True
-    return False
 
 load_today_events()
 
@@ -303,13 +273,13 @@ def generate_html():
         name_vn = translate_class(data['name'])
         if data.get('mode') == 'no_train':
             dwell_s = max(int(data.get('last_seen', 0) - data.get('enter_time', 0)), int(getattr(config, 'dwell_time', 5)))
-            html_text += f"<div class='event-item' style='background: #fff0f0; padding: 8px; border-radius: 6px; border-left: 3px solid var(--red);'><div class='time' style='color: var(--red);'>{data['start_time_str']}</div><div class='desc'><b>{name_vn}:</b> <span style='color: var(--red);'>ở trong vùng nguy hiểm {dwell_s} giây</span></div></div>"
+            html_text += f"<div class='event-item' style='background: #fff0f0; border-radius: 6px; border-left: 3px solid var(--danger);'><div class='time' style='color: var(--danger);'>{data['start_time_str']}</div><div><b>{name_vn}:</b> <span style='color: var(--danger);'>ở trong vùng nguy hiểm {dwell_s} giây</span></div></div>"
         else:
-            html_text += f"<div class='event-item' style='background: #fff0f0; padding: 8px; border-radius: 6px; border-left: 3px solid var(--red);'><div class='time' style='color: var(--red);'>{data['start_time_str']}</div><div class='desc'><b>{name_vn}</b> <span style='color: var(--red);'>đang ở trong vùng nguy hiểm</span></div></div>"
+            html_text += f"<div class='event-item' style='background: #fff0f0; border-radius: 6px; border-left: 3px solid var(--danger);'><div class='time' style='color: var(--danger);'>{data['start_time_str']}</div><div><b>{name_vn}</b> <span style='color: var(--danger);'>đang ở trong vùng nguy hiểm</span></div></div>"
         
     for ev in completed_events:
         desc = ev.get('desc', 'đã đi vào vùng nguy hiểm')
-        html_text += f"<div class='event-item' style='padding: 8px;'><div class='time'>{ev['start']} - {ev['end']}</div><div class='desc'><b>{ev['name']}</b> {desc}</div></div>"
+        html_text += f"<div class='event-item'><div class='time'>{ev['start']} - {ev['end']}</div><div><b>{ev['name']}</b> {desc}</div></div>"
     return html_text
 
 def draw_roi(frame):
@@ -338,7 +308,7 @@ def _finalize_violation_event(tid, data, date_str, default_stream_type, default_
         desc = f"đã đi vào vùng nguy hiểm{overnight_note}"
         update_txt_file(entry_d, tid, data["start_time_str"], end_time_str, data["name"], "done", mode="train_approaching")
 
-    completed_events.insert(0, {"id": tid, "name": name_vn, "start": data["start_time_str"], "end": end_time_str, "desc": desc})
+    completed_events.insert(0, {"name": name_vn, "start": data["start_time_str"], "end": end_time_str, "desc": desc})
     return True
 
 def _finalize_recording_file(rec_date, end_time_str, save_fps):
@@ -402,9 +372,6 @@ def process_and_draw(frame, results, fps, stream_type="obs", current_time=None, 
                 if obj_name not in config.selected_classes and obj_name != "train":
                     continue
 
-            x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
-            obj_name_vn = translate_class(obj_name)
-            
             track_id = str(int(box.id[0])) if box.id is not None else "?"
 
             # Nếu là Tàu hỏa: Tàu lưu thông hợp lệ trên ray, KHÔNG vẽ bbox, KHÔNG lưu sự kiện, KHÔNG cảnh báo vi phạm
@@ -417,16 +384,15 @@ def process_and_draw(frame, results, fps, stream_type="obs", current_time=None, 
                     del roi_dwell_tracker[track_id]
                 continue
 
-            label = f"{obj_name_vn} - ID: {track_id}"
+            x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
+            obj_name_vn = translate_class(obj_name)
 
             intersect = False
             if has_roi:
                 intersect = check_roi_intersection((x1, y1, x2, y2), roi_mask, pts, (h, w))
-            
-            is_violation = False
-            current_train_mode = getattr(config, 'train_mode', 'train_approaching')
 
             if intersect:
+                current_train_mode = getattr(config, 'train_mode', 'train_approaching')
                 dwell_limit = float(getattr(config, 'dwell_time', 5.0))
                 is_violation, label_suffix = update_dwell_and_evaluate_violation(
                     track_id, current_time, current_train_mode, dwell_limit,
@@ -436,9 +402,6 @@ def process_and_draw(frame, results, fps, stream_type="obs", current_time=None, 
 
                 if is_violation:
                     color = (0, 0, 255)  # Màu đỏ cảnh báo vi phạm
-                    thickness = 2
-                    label_bg = (0, 0, 255)
-                    text_color = [255, 255, 255]
                     has_danger = True
                     current_ids_in_roi.add(track_id)
                     
@@ -462,9 +425,6 @@ def process_and_draw(frame, results, fps, stream_type="obs", current_time=None, 
                         active_objects[track_id]["last_seen"] = current_time
                 else:
                     color = (0, 215, 255)  # Màu vàng cam (đối tượng mới chạm ROI hoặc chưa quá thời gian)
-                    thickness = 2
-                    label_bg = (0, 215, 255)
-                    text_color = [255, 255, 255]
             else:
                 if track_id in roi_dwell_tracker:
                     if current_time - roi_dwell_tracker[track_id]["last_seen"] > 1.5:
@@ -486,11 +446,11 @@ def process_and_draw(frame, results, fps, stream_type="obs", current_time=None, 
             if not intersect:
                 continue
 
-            cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
             t_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)[0]
             c2 = x1 + t_size[0], y1 - t_size[1] - 3
-            cv2.rectangle(frame, (x1, y1), c2, label_bg, -1, cv2.LINE_AA)
-            cv2.putText(frame, label, (x1, y1 - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.45, text_color, 1, cv2.LINE_AA)
+            cv2.rectangle(frame, (x1, y1), c2, color, -1, cv2.LINE_AA)
+            cv2.putText(frame, label, (x1, y1 - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.45, [255, 255, 255], 1, cv2.LINE_AA)
             
     ids_to_remove = []
     for tid, data in active_objects.items():
@@ -566,7 +526,7 @@ def process_and_draw(frame, results, fps, stream_type="obs", current_time=None, 
         except Exception:
             pass
     else:
-        pre_roll_buffer.append(rec_frame.copy())
+        pre_roll_buffer.append(rec_frame)
         pre_roll_meta.append(current_frame_objs)
 
     return frame, generate_html(), has_danger
@@ -603,7 +563,7 @@ def generate_frames(stream_type):
     global pre_roll_buffer, pre_roll_meta, current_stream_fps
     cap = None
     if stream_type == "obs":
-        obs_idx = find_obs_camera_index(config.load_obs_cam_from_file())
+        obs_idx = find_obs_camera_index(config.obs_cam)
         print(f"[*] Đang khởi động camera Live Stream (Index {obs_idx})...")
         live_camera.start(obs_idx)
         fps = live_camera.fps
@@ -625,7 +585,6 @@ def generate_frames(stream_type):
     frame_idx = 0
     base_video_datetime = datetime.datetime.now()
     current_dt = base_video_datetime
-    current_time = 0.0
 
     reset_tracker()
 
@@ -638,12 +597,6 @@ def generate_frames(stream_type):
         while config.stream_active[stream_type]:
             start_time = time.time()
             if stream_type == "obs":
-                # Tự động đồng bộ nếu người dùng đổi cổng camera trong mục Cài đặt
-                current_target_idx = find_obs_camera_index(config.load_obs_cam_from_file())
-                if live_camera.camera_index != current_target_idx:
-                    print(f"[*] Phát hiện thay đổi camera sang cổng {current_target_idx}, đang chuyển đổi...")
-                    live_camera.start(current_target_idx)
-
                 ret, frame = live_camera.read()
                 if not ret or frame is None:
                     camera_retry += 1
@@ -679,8 +632,6 @@ def generate_frames(stream_type):
 
                     frame_idx = 0
                     base_video_datetime = datetime.datetime.now()
-                    current_dt = base_video_datetime
-                    current_time = 0.0
 
             frame_idx += 1
             if stream_type == "video":
@@ -699,7 +650,7 @@ def generate_frames(stream_type):
                             cleanup_recording(stream_type, current_dt, base_video_datetime, fps=fps)
                         except Exception:
                             pass
-                    res_img = draw_roi(frame.copy())
+                    res_img = frame
                     config.latest_data[stream_type] = {"text": generate_html(), "alarm": False}
                 else:
                     conf = config.current_conf[stream_type]

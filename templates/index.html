@@ -6,11 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Giám sát an toàn đường sắt - Hệ thống Camera AI</title>
     <!-- CSS Stylesheets -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}?v=49">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/sidebar-topbar.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/monitor.css') }}?v=49">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/modal.css') }}?v=49">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/history.css') }}?v=49">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}?v=52">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/sidebar-topbar.css') }}?v=52">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/monitor.css') }}?v=52">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modal.css') }}?v=52">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/history.css') }}?v=52">
 </head>
 
 <body>
@@ -114,7 +114,7 @@
     <!-- ===== MAIN CONTENT ===== -->
     <main class="main-content">
         <!-- Chế độ 1: Giám sát trực tiếp (Phân tích) -->
-        <div id="view_monitor" class="app-view active">
+        <div id="view_monitor" class="app-view">
             <!-- Cột trái: Bảng điều khiển (Control Panel) -->
             <div class="control-panel">
                 <!-- Card 1: Nguồn giám sát -->
@@ -155,7 +155,7 @@
                         <div class="upload-zone" id="zone_video">
                             <div class="thumb-preview-wrap">
                                 <button class="clear-btn" title="Hủy chọn video"
-                                    onclick="clearMedia('video', event)">✕</button>
+                                    onclick="clearMedia(event)">✕</button>
                                 <img id="thumb_video" class="thumb-preview" src="" alt="Hình xem trước">
                             </div>
                             <div class="upload-content">
@@ -391,7 +391,7 @@
         </div>
 
         <!-- Chế độ 2: Tra cứu Lịch sử vi phạm (Lịch sử) -->
-        <div id="view_history" class="app-view" style="display: none;">
+        <div id="view_history" class="app-view">
             <!-- Header bar của Lịch sử -->
             <div class="history-top-bar">
                 <div class="history-top-left">
@@ -460,7 +460,7 @@
                         <!-- Thống kê nhỏ -->
                         <div class="history-stats-row">
                             <span id="history_stat_text">Đang tải danh sách...</span>
-                            <button type="button" class="btn-refresh-history" onclick="reloadHistoryEvents()"
+                            <button type="button" class="btn-refresh-history" onclick="initHistoryView()"
                                 title="Làm mới">
                                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -657,7 +657,7 @@
                         <input type="number" id="modal_conf_input" min="0.1" max="1.0" step="0.05" value="0.5"
                             class="conf-badge-input" onchange="syncModalConf(this.value)">
                     </label>
-                    <div class="slider-wrap" style="padding-top: 6px;">
+                    <div class="slider-wrap">
                         <input type="range" id="modal_conf_slider" min="0.1" max="1.0" step="0.05" value="0.5"
                             oninput="syncModalConf(this.value)">
                     </div>
@@ -675,7 +675,7 @@
                             <span style="font-size: 12px; color: var(--text-secondary); font-weight: 600;">giây</span>
                         </div>
                     </label>
-                    <div class="slider-wrap" style="padding-top: 6px;">
+                    <div class="slider-wrap">
                         <input type="range" id="modal_dwell_slider" min="1" max="30" step="1" value="5"
                             oninput="syncModalDwell(this.value)">
                     </div>
@@ -805,12 +805,12 @@
     </div>
 
     <!-- JavaScript Modules -->
-    <script src="{{ url_for('static', filename='js/tab_lock.js') }}?v=50"></script>
-    <script src="{{ url_for('static', filename='js/app.js') }}?v=50"></script>
-    <script src="{{ url_for('static', filename='js/roi.js') }}?v=50"></script>
-    <script src="{{ url_for('static', filename='js/monitor.js') }}?v=50"></script>
-    <script src="{{ url_for('static', filename='js/history.js') }}?v=51"></script>
-    <script src="{{ url_for('static', filename='js/settings.js') }}?v=50"></script>
+    <script src="{{ url_for('static', filename='js/tab_lock.js') }}?v=52"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=52"></script>
+    <script src="{{ url_for('static', filename='js/roi.js') }}?v=52"></script>
+    <script src="{{ url_for('static', filename='js/monitor.js') }}?v=52"></script>
+    <script src="{{ url_for('static', filename='js/history.js') }}?v=52"></script>
+    <script src="{{ url_for('static', filename='js/settings.js') }}?v=52"></script>
 </body>
 
 </html>

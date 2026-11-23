@@ -88,19 +88,6 @@ def build():
     else:
         print("[!] CANH BAO: Khong tim thay ffmpeg.exe de sao chep vao goi phan phoi!")
 
-    # Loai bo ban sao ffmpeg trung lap ben trong _internal de tiet kiem ~84MB
-    internal_dir = os.path.join(target_dir, "_internal")
-    if os.path.exists(internal_dir):
-        for r, _dirs, fs in os.walk(internal_dir):
-            for f in fs:
-                if "ffmpeg" in f.lower() and f.lower().endswith(".exe"):
-                    dup_p = os.path.join(r, f)
-                    try:
-                        os.remove(dup_p)
-                        print(f"[*] Da loai bo ban sao ffmpeg trung lap trong _internal: {dup_p}")
-                    except Exception:
-                        pass
-
     # 5.5 Kiem tra va tu dong tai vc_redist.x64.exe neu thieu (phuc vu tao bo cai Inno Setup)
     vc_path = os.path.join(base_dir, "vc_redist.x64.exe")
     if not os.path.exists(vc_path):

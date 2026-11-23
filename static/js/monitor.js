@@ -95,29 +95,21 @@ function updateAlarmUI(isAlarm) {
 
     header.classList.remove('alarm-safe', 'alarm-danger');
 
-    if (currentTrainMode === 'train_approaching') {
-        if (isAlarm) {
-            header.classList.add('alarm-danger');
-            txt.innerText = "Phát hiện vật thể xâm nhập vùng nguy hiểm!";
-            if (isMonitoring) {
-                playAlarmAudio('train_approaching');
-            }
-        } else {
-            header.classList.add('alarm-safe');
-            txt.innerText = "An toàn!";
-            stopAlarmAudioGracefully();
+    if (!isAlarm) {
+        header.classList.add('alarm-safe');
+        txt.innerText = "An toàn!";
+        stopAlarmAudioGracefully();
+    } else if (currentTrainMode === 'train_approaching') {
+        header.classList.add('alarm-danger');
+        txt.innerText = "Phát hiện vật thể xâm nhập vùng nguy hiểm!";
+        if (isMonitoring) {
+            playAlarmAudio('train_approaching');
         }
     } else {
-        if (isAlarm) {
-            header.classList.add('alarm-danger');
-            txt.innerText = "Vật thể quá lâu trong vùng nguy hiểm!";
-            if (isMonitoring) {
-                playAlarmAudio('no_train');
-            }
-        } else {
-            header.classList.add('alarm-safe');
-            txt.innerText = "An toàn!";
-            stopAlarmAudioGracefully();
+        header.classList.add('alarm-danger');
+        txt.innerText = "Vật thể quá lâu trong vùng nguy hiểm!";
+        if (isMonitoring) {
+            playAlarmAudio('no_train');
         }
     }
 }
@@ -184,13 +176,10 @@ function setMode(mode) {
             mainImg.src = thumb.src;
             hideMediaPlaceholder(true);
             setTimeout(drawSavedRoiOnDisplay, 100);
-        } else if (!mainImg.src || mainImg.src === window.location.href || mainImg.src.indexOf('/video_feed/obs') !== -1) {
+        } else {
             mainImg.src = "";
             clearDisplayRoiCanvas();
             hideMediaPlaceholder(false);
-        } else {
-            hideMediaPlaceholder(true);
-            setTimeout(drawSavedRoiOnDisplay, 100);
         }
     }
 }
@@ -268,24 +257,24 @@ async function uploadVideoPreview(event) {
 }
 
 // Xóa video đã chọn
-function clearMedia(type, event) {
+function clearMedia(event) {
     if (event) {
         event.preventDefault();
         event.stopPropagation();
     }
-    const input = document.getElementById('input_' + type);
+    const input = document.getElementById('input_video');
     if (input) input.value = "";
 
     const mainImg = document.getElementById('main_preview');
     mainImg.src = "";
 
-    const thumb = document.getElementById('thumb_' + type);
+    const thumb = document.getElementById('thumb_video');
     if (thumb) {
         thumb.src = "";
         thumb.style.display = 'none';
     }
 
-    const zone = document.getElementById('zone_' + type);
+    const zone = document.getElementById('zone_video');
     if (zone) zone.classList.remove('has-file');
 
     const statusText = document.getElementById('vid_status_text');
@@ -293,20 +282,18 @@ function clearMedia(type, event) {
 
     updateAlarmUI(false);
     if (isMonitoring) stopMonitor();
-    if (type === 'video') isVideoStreamRunning = false;
+    isVideoStreamRunning = false;
     clearInterval(pollInterval);
     clearDisplayRoiCanvas();
     hideMediaPlaceholder(false);
 
-    fetch(`/stop_stream/${type}`).then(() => {
-        if (type === 'video') {
-            setTimeout(() => fetch('/delete_video', { method: 'POST' }), 500);
-        }
+    fetch('/stop_stream/video').then(() => {
+        setTimeout(() => fetch('/delete_video', { method: 'POST' }), 500);
     }).catch(() => {});
 }
 
 // Giám sát
-async function startMonitor() {
+function startMonitor() {
     if (!savedRoiPoints || savedRoiPoints.length < 3) {
         alert("Vui lòng vẽ và lưu Vùng nguy hiểm (ROI) trước khi bắt đầu giám sát!");
         return;

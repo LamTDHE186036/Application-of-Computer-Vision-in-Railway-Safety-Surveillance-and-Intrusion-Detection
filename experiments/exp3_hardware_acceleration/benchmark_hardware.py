@@ -60,8 +60,8 @@ def get_hardware_info():
         if "GPU" in devices:
             info["gpu"] = core.get_property("GPU", "FULL_DEVICE_NAME")
             info["has_ov_gpu"] = True
-    except Exception as e:
-        info["error"] = str(e)
+    except Exception:
+        pass
     return info
 
 def load_video_frames(video_path, num_frames=150):

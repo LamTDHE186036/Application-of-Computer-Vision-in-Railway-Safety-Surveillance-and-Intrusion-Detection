@@ -296,19 +296,11 @@
     border: 1px solid var(--success-border);
 }
 
-.alarm-safe .alarm-status-info strong {
-    color: var(--success-text);
-}
-
 .alarm-danger {
     background: var(--danger-bg);
     color: var(--danger-text);
     border: 1px solid var(--danger-border);
     animation: pulse-danger 1s infinite alternate;
-}
-
-.alarm-danger .alarm-status-info strong {
-    color: var(--danger-text);
 }
 
 @keyframes pulse-danger {
@@ -466,7 +458,7 @@
 }
 
 .slider-wrap {
-    padding-top: 4px;
+    padding-top: 6px;
 }
 
 input[type="range"] {
@@ -859,9 +851,6 @@ input[type="range"] {
 @media (max-width: 1200px) {
     #view_monitor {
         grid-template-columns: 1fr;
-    }
-    .media-column {
-        grid-template-columns: minmax(0, 1fr) 280px;
     }
 }
 

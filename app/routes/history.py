@@ -1,6 +1,7 @@
 import os
 import re
 import cv2
+import json
 import time
 import datetime
 from flask import Blueprint, request, jsonify, Response, send_from_directory
@@ -23,22 +24,25 @@ def get_history_events():
     else:
         date_str = date_param
 
+    def parse_t(s):
+        p = list(map(int, s.replace('h', ':').replace('m', ':').replace('s', '').split(':')))
+        return p[0] * 3600 + p[1] * 60 + p[2]
+
     vid_dir = os.path.join(VID_DIR, date_str)
     videos = []
+    video_track_ids = {}
+    video_has_meta = {}
     if os.path.exists(vid_dir):
         for f in sorted(os.listdir(vid_dir)):
             if f.endswith('.mp4') and not f.endswith('.h264.mp4') and not f.endswith('_dang_ghi.mp4'):
                 m = re.search(r'(\d{2}h\d{2}m\d{2}s)_den_(\d{2}h\d{2}m\d{2}s)', f)
                 if m:
-                    def parse_t(s):
-                        p = list(map(int, s.replace('h', ':').replace('m', ':').replace('s', '').split(':')))
-                        return p[0] * 3600 + p[1] * 60 + p[2]
-
                     # Nạp danh sách các Track ID có trong tệp JSON đi kèm video để phục vụ khớp chính xác 100%
                     v_meta_fn = os.path.splitext(f)[0] + ".json"
                     v_meta_path = os.path.join(vid_dir, v_meta_fn)
                     track_ids = set()
-                    if os.path.exists(v_meta_path):
+                    has_v_meta = os.path.exists(v_meta_path)
+                    if has_v_meta:
                         try:
                             with open(v_meta_path, 'r', encoding='utf-8') as jf:
                                 jd = json.load(jf)
@@ -49,13 +53,12 @@ def get_history_events():
                         except Exception:
                             pass
 
+                    video_track_ids[f] = track_ids
+                    video_has_meta[f] = has_v_meta
                     videos.append({
                         'filename': f,
                         'start_sec': parse_t(m.group(1)),
-                        'end_sec': parse_t(m.group(2)),
-                        'start_time': m.group(1).replace('h', ':').replace('m', ':').replace('s', ''),
-                        'end_time': m.group(2).replace('h', ':').replace('m', ':').replace('s', ''),
-                        'track_ids': list(track_ids)
+                        'end_sec': parse_t(m.group(2))
                     })
 
     def normalize_obj_name(name):
@@ -76,7 +79,7 @@ def get_history_events():
     events = []
     if os.path.exists(txt_path):
         with open(txt_path, 'r', encoding='utf-8') as f:
-            for idx, raw_line in enumerate(f):
+            for raw_line in f:
                 line = raw_line.strip()
                 if not line:
                     continue
@@ -95,7 +98,7 @@ def get_history_events():
                     # Tầng 1 (Ưu tiên tuyệt đối): Video bao trùm thời gian VÀ có chứa đúng Track ID trong tệp metadata JSON
                     for v in videos:
                         if v['start_sec'] - 2 <= ev_sec <= v['end_sec'] + 2:
-                            if target_tid_str and target_tid_str in v.get('track_ids', set()):
+                            if target_tid_str and target_tid_str in video_track_ids.get(v['filename'], set()):
                                 best_v = v
                                 break
 
@@ -111,7 +114,7 @@ def get_history_events():
                     if not best_v and target_tid_str:
                         for v in videos:
                             if min(abs(ev_sec - v['start_sec']), abs(ev_sec - v['end_sec'])) <= 10:
-                                if target_tid_str in v.get('track_ids', set()):
+                                if target_tid_str in video_track_ids.get(v['filename'], set()):
                                     best_v = v
                                     break
 
@@ -129,13 +132,11 @@ def get_history_events():
                     v_dur = max(0, best_v['end_sec'] - best_v['start_sec']) if best_v else 0
 
                     offset_sec = max(0, ev_sec - best_v['start_sec']) if best_v else 0
-                    meta_fn = os.path.splitext(fn)[0] + ".json" if fn else None
-                    meta_path = os.path.join(VID_DIR, date_str, meta_fn) if (fn and meta_fn) else None
-                    has_meta = bool(meta_path and os.path.exists(meta_path))
+                    has_meta = bool(fn and video_has_meta.get(fn, False))
+                    meta_fn = os.path.splitext(fn)[0] + ".json" if has_meta else None
                     meta_url = f"/history_metadata/{date_str}/{meta_fn}" if has_meta else None
 
                     events.append({
-                        'index': idx + 1,
                         'date': date_str,
                         'start_time': start_t,
                         'end_time': end_t,
@@ -155,7 +156,6 @@ def get_history_events():
     return jsonify({
         "status": "success",
         "date": date_str,
-        "total": len(events),
         "events": events_reversed,
         "videos": videos
     })

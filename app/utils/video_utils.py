@@ -41,14 +41,6 @@ def get_ffmpeg_path():
     except Exception:
         pass
 
-    if not search_dirs:
-        if getattr(sys, 'frozen', False):
-            exe_dir = os.path.dirname(sys.executable)
-            search_dirs.extend([exe_dir, getattr(sys, '_MEIPASS', exe_dir)])
-        else:
-            root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-            search_dirs.append(root_dir)
-
     search_dirs = list(dict.fromkeys(search_dirs))
 
     for b_dir in search_dirs:

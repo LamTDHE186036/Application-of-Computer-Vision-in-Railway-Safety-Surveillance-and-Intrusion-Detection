@@ -70,7 +70,7 @@ function checkTabLockOnStartup() {
         // Nếu đã có tab khác đang hoạt động và còn gửi nhịp tim trong vòng 4 giây
         if (activeTabId && activeTabId !== currentTabId && (now - lastHb < HEARTBEAT_TIMEOUT_MS)) {
             blockCurrentTab();
-            return false;
+            return;
         }
     } catch (e) {}
 
@@ -78,7 +78,6 @@ function checkTabLockOnStartup() {
     unblockCurrentTab();
     startHeartbeat();
     sendBroadcast('claim');
-    return true;
 }
 
 function blockCurrentTab() {

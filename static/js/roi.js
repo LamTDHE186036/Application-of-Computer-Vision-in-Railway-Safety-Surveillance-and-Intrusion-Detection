@@ -23,8 +23,6 @@ function resizeCanvas() {
                 c.style.height = h + 'px';
                 c.style.left = left + 'px';
                 c.style.top = top + 'px';
-                c.style.right = 'auto';
-                c.style.bottom = 'auto';
             }
         });
     } else if (camContainer) {

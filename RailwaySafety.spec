@@ -20,11 +20,6 @@ hiddenimports = [
     'cv2',
     'torch',
     'torchvision',
-    'openvino',
-    'openvino.runtime',
-    'ultralytics',
-    'ultralytics.models.yolo',
-    'ultralytics.nn.modules',
 ]
 hiddenimports += collect_submodules('ultralytics')
 hiddenimports += collect_submodules('openvino')

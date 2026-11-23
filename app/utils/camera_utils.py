@@ -172,7 +172,7 @@ def find_obs_camera_index(configured_val=None, cameras=None):
         if cam.get('is_obs'):
             return cam['index']
 
-    if cameras and len(cameras) > 0:
+    if cameras:
         return cameras[0]['index']
 
     return 0
@@ -190,7 +190,6 @@ class LiveCameraCapture:
     def __init__(self):
         self.lock = threading.Lock()
         self.cap = None
-        self.thread = None
         self.running = False
         self.camera_index = None
         self.latest_frame = None
@@ -246,8 +245,7 @@ class LiveCameraCapture:
 
             self.cap = cap
             self.running = True
-            self.thread = threading.Thread(target=self._worker, daemon=True)
-            self.thread.start()
+            threading.Thread(target=self._worker, daemon=True).start()
             return True
 
     def _worker(self):
@@ -291,7 +289,7 @@ class LiveCameraCapture:
                 cap_to_release.release()
             except Exception:
                 pass
-        print(f"[*] [LiveCameraCapture] Đã đóng camera an toàn.")
+        print("[*] [LiveCameraCapture] Đã đóng camera an toàn.")
 
 live_camera = LiveCameraCapture()
 

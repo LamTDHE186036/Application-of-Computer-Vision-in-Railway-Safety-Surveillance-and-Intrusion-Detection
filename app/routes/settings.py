@@ -18,10 +18,9 @@ def get_config():
 @settings_bp.route('/get_cameras', methods=['GET'])
 def get_cameras():
     cameras = get_system_cameras()
-    configured = config.load_obs_cam_from_file()
+    configured = config.obs_cam
     active_index = find_obs_camera_index(configured, cameras=cameras)
     return jsonify({
-        "status": "success",
         "cameras": cameras,
         "configured": configured,
         "active_index": active_index
@@ -75,11 +74,4 @@ def set_settings():
                 live_camera.start(target_idx)
             except Exception as e:
                 print(f"[!] Lỗi chuyển đổi camera: {e}")
-    return jsonify({
-        "status": "success",
-        "conf": config.current_conf.get("obs", config.initial_conf),
-        "classes": config.selected_classes,
-        "dwell_time": config.dwell_time,
-        "train_mode": config.train_mode,
-        "obs_cam": config.obs_cam
-    })
+    return jsonify({"status": "success"})

@@ -43,7 +43,7 @@ def create_app():
     app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024
 
     @app.errorhandler(413)
-    def request_entity_too_large(error):
+    def request_entity_too_large(_error):
         from flask import jsonify
         return jsonify({
             "status": "error",

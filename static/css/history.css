@@ -9,7 +9,6 @@
     gap: 8px;
     width: 100%;
     height: calc(100vh - 56px - 28px);
-    max-height: calc(100vh - 56px - 28px);
     overflow: hidden;
 }
 
@@ -707,9 +706,7 @@
 }
 
 /* Ẩn triệt để extension Video Speed Controller và các lớp tua ngầm của trình duyệt */
-.vsc-controller,
 .vsc-controller *,
-div.vsc-controller,
 [class*="vsc-"],
 [id*="vsc-"] {
     display: none !important;
