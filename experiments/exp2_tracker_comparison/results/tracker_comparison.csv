@@ -1,0 +1,4 @@
+Method,Latency_ms,P95_Latency_ms,Overhead_ms,FPS,Unique_IDs,Avg_Lifespan_Frames,ID_Fragmentations,Dwell_Support
+Pure YOLO (No Tracking),134.67,202.77,0.0,7.4,N/A,0.0,N/A,Không thể đo (Không có ID)
+BoT-SORT / DeepSORT,144.96,217.1,10.29,6.9,1,5.0,0,Khả thi (Lưu bình quân 5.0 frames/ID)
+ByteTrack (Đề xuất),139.41,204.25,4.74,7.2,1,5.0,0,Khả thi (Lưu bình quân 5.0 frames/ID)
