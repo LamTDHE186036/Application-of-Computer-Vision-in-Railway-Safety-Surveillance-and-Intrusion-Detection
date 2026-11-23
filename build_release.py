@@ -3,13 +3,15 @@ import sys
 import shutil
 import subprocess
 
+APP_VERSION = "1.2.1"
+
 def build():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     dist_dir = os.path.join(base_dir, "dist")
     target_dir = os.path.join(dist_dir, "RailwaySafety")
 
     print("=" * 70)
-    print("   TIEN HANH DONG GOI SAN PHAM V1.2.1 BANG PYINSTALLER")
+    print(f"   TIEN HANH DONG GOI SAN PHAM V{APP_VERSION} BANG PYINSTALLER")
     print("=" * 70)
 
     # 1. Chạy PyInstaller
@@ -110,11 +112,11 @@ def build():
     print(f"[*] Da tao thu muc data ngang hang tai: {dst_data}")
 
     # 7. Tao file Khoi_Dong.bat giu lai console de hien thi thong tin va tranh tu dong thoat
-    bat_content = """@echo off
-title Railway Safety Surveillance System v1.0.0
+    bat_content = f"""@echo off
+title Railway Safety Surveillance System v{APP_VERSION}
 cd /d "%~dp0"
 echo ========================================================
-echo    HE THONG GIAM SAT AN TOAN DUONG SAT (v1.0.0)
+echo    HE THONG GIAM SAT AN TOAN DUONG SAT (v{APP_VERSION})
 echo ========================================================
 echo Dang khoi chay he thong...
 RailwaySafety.exe
@@ -131,8 +133,8 @@ if %ERRORLEVEL% NEQ 0 (
         f.write(bat_content)
 
     # 8. Tao file README_HUONG_DAN.txt cho nguoi dung cuoi
-    readme_content = """========================================================================
-   HE THONG GIAM SAT AN TOAN DUONG SAT VA CANH BAO VI PHAM (V1.0.0)
+    readme_content = f"""========================================================================
+   HE THONG GIAM SAT AN TOAN DUONG SAT VA CANH BAO VI PHAM (V{APP_VERSION})
 ========================================================================
 
 1. CACH KHOI DONG:
@@ -142,9 +144,9 @@ if %ERRORLEVEL% NEQ 0 (
 
 2. XEM VIDEO VA LICH SU VI PHAM TRUC TIEP TREN MAY:
    - Thu muc "data" nam ngay canh file "RailwaySafety.exe".
-   - Video vi pham: nam tai "data/recordings/{ngay-thang-nam}/"
+   - Video vi pham: nam tai "data/recordings/{{ngay-thang-nam}}/"
      -> Ban co the mo truc tiep bang Windows Media Player / VLC / Movies & TV.
-   - Nhat ky su kien vi pham: nam tai "data/intrusion_logs/Lich_su_{ngay-thang-nam}.txt".
+   - Nhat ky su kien vi pham: nam tai "data/intrusion_logs/Lich_su_{{ngay-thang-nam}}.txt".
 
 3. XEM TREN GIAO DIEN WEB:
    - Truy cap muc "Lich su" tren thanh menu trai de xem video va danh sach truc tiep tren web.

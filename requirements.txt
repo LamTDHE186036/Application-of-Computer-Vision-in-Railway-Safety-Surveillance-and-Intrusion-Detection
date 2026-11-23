@@ -6,3 +6,4 @@ numpy
 torch
 pandas
 imageio-ffmpeg
+# pyinstaller>=6.0.0  # (Tùy chọn) Chỉ cần khi chạy build_release.py để đóng gói .exe

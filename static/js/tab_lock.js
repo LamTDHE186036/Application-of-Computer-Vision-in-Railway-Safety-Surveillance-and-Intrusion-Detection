@@ -36,7 +36,7 @@ function sendBroadcast(action) {
     if (broadcastChannel) {
         try {
             broadcastChannel.postMessage({ action: action, tabId: currentTabId });
-        } catch (e) {}
+        } catch (e) { }
     }
 }
 
@@ -44,7 +44,7 @@ function updateHeartbeat() {
     try {
         localStorage.setItem(TAB_LOCK_STORAGE_KEY, currentTabId);
         localStorage.setItem(TAB_LOCK_HEARTBEAT_KEY, String(Date.now()));
-    } catch (e) {}
+    } catch (e) { }
 }
 
 function startHeartbeat() {
@@ -72,7 +72,7 @@ function checkTabLockOnStartup() {
             blockCurrentTab();
             return;
         }
-    } catch (e) {}
+    } catch (e) { }
 
     // Chiếm quyền tab chủ sở hữu
     unblockCurrentTab();
@@ -86,7 +86,7 @@ function blockCurrentTab() {
 
     // Dừng toàn bộ âm thanh và luồng video nếu đang chạy
     if (typeof forceStopAlarmAudio === 'function') {
-        try { forceStopAlarmAudio(); } catch (e) {}
+        try { forceStopAlarmAudio(); } catch (e) { }
     }
 
     const overlay = document.getElementById('duplicate_tab_overlay');
@@ -107,11 +107,6 @@ function claimTabControl() {
     unblockCurrentTab();
     startHeartbeat();
     sendBroadcast('claim');
-
-    // Làm mới luồng stream nếu cần
-    if (typeof setMode === 'function' && typeof currentMode !== 'undefined') {
-        try { setMode(currentMode); } catch (e) {}
-    }
 }
 
 function isTabBlocked() {
@@ -127,7 +122,7 @@ window.addEventListener('beforeunload', () => {
             localStorage.removeItem(TAB_LOCK_HEARTBEAT_KEY);
             sendBroadcast('tab_closed');
         }
-    } catch (e) {}
+    } catch (e) { }
 });
 
 // Khởi chạy kiểm tra ngay khi nạp file
