@@ -27,18 +27,17 @@ def build():
     dst_models = os.path.join(target_dir, "models")
     os.makedirs(dst_models, exist_ok=True)
 
-    for m_name in ["yolo26s"]:
-        src_m = os.path.join(src_models, m_name)
-        dst_m = os.path.join(dst_models, m_name)
-        if os.path.exists(src_m):
-            print(f"[*] Dang sao chep mo hinh AI {m_name} sang: {dst_m}")
-            if os.path.exists(dst_m):
-                shutil.rmtree(dst_m)
-            shutil.copytree(
-                src_m,
-                dst_m,
-                ignore=shutil.ignore_patterns("*.py", "*.pyc", "__pycache__", ".git*")
-            )
+    src_m = os.path.join(src_models, "yolo26s")
+    dst_m = os.path.join(dst_models, "yolo26s")
+    if os.path.exists(src_m):
+        print(f"[*] Dang sao chep mo hinh AI yolo26s sang: {dst_m}")
+        if os.path.exists(dst_m):
+            shutil.rmtree(dst_m)
+        shutil.copytree(
+            src_m,
+            dst_m,
+            ignore=shutil.ignore_patterns("*.py", "*.pyc", "__pycache__", ".git*")
+        )
 
     # 3. Sao chep configs/ sang dist/RailwaySafety/configs/ (luon ghi de de cap nhat cau hinh moi nhat)
     src_configs = os.path.join(base_dir, "configs")

@@ -317,7 +317,7 @@ function startMonitor() {
         isMonitoring = true;
         updateMonitorButtonUI();
         const mainImg = document.getElementById('main_preview');
-        if (!mainImg.src || mainImg.src === window.location.href || mainImg.src.indexOf('/video_feed/obs') === -1) {
+        if (!mainImg.src || mainImg.src.indexOf('/video_feed/obs') === -1) {
             startStream('obs', 1);
         } else {
             fetch('/set_ai/obs?ai=1').catch(() => {});

@@ -188,7 +188,7 @@ def run_hardware_benchmark(pt_path=None, ov_path=None, num_frames=150, imgsz=640
                 print(f"[!] Thử lại với device='GPU' thất bại: {e2}")
 
     # Bảng tổng kết
-    baseline_lat = results.get("pytorch_cpu", {}).get("avg_lat", 0.0) if "pytorch_cpu" in results else 0.0
+    baseline_lat = (results.get("pytorch_cpu") or {}).get("avg_lat", 0.0)
 
     print("\n\n" + "=" * 102)
     print(" BẢNG TỔNG HỢP HIỆU NĂNG TĂNG TỐC PHẦN CỨNG (INFERENCE BENCHMARK)")

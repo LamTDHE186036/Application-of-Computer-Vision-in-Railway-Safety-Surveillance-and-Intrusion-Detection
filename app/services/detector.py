@@ -119,11 +119,7 @@ def load_yolo_model():
     if "openvino" in selected_model_path.lower():
         device = get_optimal_device()
     else:
-        try:
-            import torch
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-        except Exception:
-            device = "cpu"
+        device = "cuda" if res_info["has_gpu"] else "cpu"
 
     model_instance = YOLO(selected_model_path)
     print(f"[*] Đã nạp thành công mô hình: {selected_model_path} trên thiết bị {device}")
@@ -140,9 +136,8 @@ CLASS_NAMES_VI = {
     "car": "Ô tô",
     "motorcycle": "Xe máy",
     "person": "Người",
-    "truck-bus": "Xe tải/Xe buýt",
-    "train": "Tàu hỏa"
-} 
+    "truck-bus": "Xe tải/Xe buýt"
+}
 
 def translate_class(eng_name):
     return CLASS_NAMES_VI.get(eng_name.lower(), eng_name)
@@ -165,8 +160,7 @@ recording_start_time_str = ""
 temp_video_filename = ""
 last_activity_time = 0.0
 has_valid_event_in_recording = False
-roi_dwell_tracker = {}  # {track_id: {"enter_time": float, "last_seen": float, "violating": bool}}
-current_stream_fps = 30.0 # Tốc độ khung hình thực tế của luồng đang xử lý (tự động nhận diện)
+roi_dwell_tracker = {}  # {track_id: {"enter_time": float, "last_seen": float}}
 pre_roll_buffer = deque(maxlen=90) # Bộ đệm xoay vòng lưu trước sự kiện
 pre_roll_meta = deque(maxlen=90)   # Bộ đệm xoay vòng lưu metadata trước sự kiện
 current_recording_meta = []         # Danh sách metadata các khung hình của clip đang ghi
@@ -552,7 +546,7 @@ def cleanup_recording(stream_type="obs", current_dt=None, base_dt=None, fps=None
         is_recording = False
         now_str = now.strftime("%Hh%Mm%Ss")
         day_str = recording_start_date_str if recording_start_date_str else (current_date_str if current_date_str else date_str)
-        actual_fps = fps if (fps and fps > 0) else (current_stream_fps if current_stream_fps > 0 else 30.0)
+        actual_fps = fps if (fps and fps > 0) else 30.0
         _finalize_recording_file(day_str, now_str, actual_fps)
 
 
@@ -560,7 +554,7 @@ def reset_tracker():
     svc_reset_tracker(model)
 
 def generate_frames(stream_type):
-    global pre_roll_buffer, pre_roll_meta, current_stream_fps
+    global pre_roll_buffer, pre_roll_meta
     cap = None
     if stream_type == "obs":
         obs_idx = find_obs_camera_index(config.obs_cam)
@@ -573,7 +567,6 @@ def generate_frames(stream_type):
 
     if fps is None or np.isnan(fps) or fps <= 0 or fps > 120:
         fps = 30.0
-    current_stream_fps = fps
     delay = 1.0 / fps
 
     # Đặt kích thước buffer cho pre-roll (3 giây)
