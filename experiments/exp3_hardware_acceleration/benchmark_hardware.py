@@ -122,9 +122,15 @@ def benchmark_single_target(model_path, frames, device="cpu", imgsz=640, warmup_
     }
 
 def run_hardware_benchmark(pt_path=None, ov_path=None, num_frames=150, imgsz=640, video_path=None):
-    # 1. Kiểm tra video Dataset_test/test_exp.mp4
+    # 1. Kiểm tra video dataset_test/test_exp.mp4
     if not video_path:
-        video_path = os.path.join(BASE_DIR, "Dataset_test", "test_exp.mp4")
+        for folder_name in ("dataset_test", "Dataset_test"):
+            candidate = os.path.join(BASE_DIR, folder_name, "test_exp.mp4")
+            if os.path.exists(candidate):
+                video_path = candidate
+                break
+        else:
+            video_path = os.path.join(BASE_DIR, "dataset_test", "test_exp.mp4")
 
     if not os.path.exists(video_path):
         print(f"[!] LỖI: Không tìm thấy video thực nghiệm tại: {video_path}")
