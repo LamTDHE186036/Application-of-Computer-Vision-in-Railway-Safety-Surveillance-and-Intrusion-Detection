@@ -360,7 +360,7 @@
     font-style: italic;
 }
 
-/* Video Player Stage */
+/* Khung trình chiếu video */
 .history-player-column {
     display: flex;
     flex-direction: column;
@@ -625,7 +625,7 @@
 }
 
 
-/* ===== SPOTLIGHT MODE & CANVAS OVERLAY ===== */
+/* ===== CHẾ ĐỘ ĐÈN RỌI (SPOTLIGHT) & LỚP PHỦ CANVAS ===== */
 .spotlight-mode-group {
     display: inline-flex;
     align-items: center;
@@ -667,7 +667,7 @@
     flex-shrink: 0;
 }
 
-/* Spotlight HUD Over Video */
+/* Thanh thông tin chế độ đèn rọi trên video */
 .spotlight-hud {
     position: absolute;
     top: 10px;

@@ -90,7 +90,7 @@ def benchmark_single_target(model_path, frames, device="cpu", imgsz=640, warmup_
 
     warmup_frame = frames[0]
 
-    # Warmup
+    # Khởi động mô hình (Warmup)
     print(f"[*] Đang chạy khởi động (Warmup {warmup_iters} frames)...")
     for _ in range(warmup_iters):
         _ = model(warmup_frame, verbose=False, device=device, imgsz=imgsz)

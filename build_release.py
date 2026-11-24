@@ -3,6 +3,12 @@ import sys
 import shutil
 import subprocess
 
+# Đảm bảo xuất tiếng Việt có dấu ổn định trên cửa sổ dòng lệnh Windows
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 APP_VERSION = "1.2.1"
 
 def build():
@@ -11,20 +17,20 @@ def build():
     target_dir = os.path.join(dist_dir, "RailwaySafety")
 
     print("=" * 70)
-    print(f"   TIEN HANH DONG GOI SAN PHAM V{APP_VERSION} BANG PYINSTALLER")
+    print(f"   TIẾN HÀNH ĐÓNG GÓI SẢN PHẨM V{APP_VERSION} BẰNG PYINSTALLER")
     print("=" * 70)
 
     # 1. Chạy PyInstaller
     cmd = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "RailwaySafety.spec"]
-    print(f"[*] Dang chay lenh: {' '.join(cmd)}")
+    print(f"[*] Đang chạy lệnh: {' '.join(cmd)}")
     res = subprocess.run(cmd, cwd=base_dir)
     if res.returncode != 0:
-        print("[!] Loi xay ra trong qua trinh dong goi bang PyInstaller!")
+        print("[!] Lỗi xảy ra trong quá trình đóng gói bằng PyInstaller!")
         sys.exit(res.returncode)
 
-    print("\n[*] PyInstaller hoan tat! Tien hanh chuan bi thu muc phan phoi...")
+    print("\n[*] PyInstaller hoàn tất! Tiến hành chuẩn bị thư mục phân phối...")
 
-    # 2. Sao chep mo hinh AI yolo26s sang dist/RailwaySafety/models/
+    # 2. Sao chép mô hình AI yolo26s sang dist/RailwaySafety/models/
     src_models = os.path.join(base_dir, "models")
     dst_models = os.path.join(target_dir, "models")
     os.makedirs(dst_models, exist_ok=True)
@@ -32,7 +38,7 @@ def build():
     src_m = os.path.join(src_models, "yolo26s")
     dst_m = os.path.join(dst_models, "yolo26s")
     if os.path.exists(src_m):
-        print(f"[*] Dang sao chep mo hinh AI yolo26s sang: {dst_m}")
+        print(f"[*] Đang sao chép mô hình AI yolo26s sang: {dst_m}")
         if os.path.exists(dst_m):
             shutil.rmtree(dst_m)
         shutil.copytree(
@@ -41,11 +47,11 @@ def build():
             ignore=shutil.ignore_patterns("*.py", "*.pyc", "__pycache__", ".git*")
         )
 
-    # 3. Sao chep configs/ sang dist/RailwaySafety/configs/ (luon ghi de de cap nhat cau hinh moi nhat)
+    # 3. Sao chép configs/ sang dist/RailwaySafety/configs/ (luôn ghi đè để cập nhật cấu hình mới nhất)
     src_configs = os.path.join(base_dir, "configs")
     dst_configs = os.path.join(target_dir, "configs")
     if os.path.exists(src_configs):
-        print(f"[*] Dang sao chep cau hinh configs sang: {dst_configs}")
+        print(f"[*] Đang sao chép cấu hình configs sang: {dst_configs}")
         os.makedirs(dst_configs, exist_ok=True)
         for item in os.listdir(src_configs):
             if item.endswith(('.json', '.yaml', '.yml')):
@@ -54,11 +60,11 @@ def build():
                 if os.path.isfile(s):
                     shutil.copy2(s, d)
 
-    # 4. Sao chep audio_alerts/ sang dist/RailwaySafety/audio_alerts/
+    # 4. Sao chép audio_alerts/ sang dist/RailwaySafety/audio_alerts/
     src_audio = os.path.join(base_dir, "audio_alerts")
     dst_audio = os.path.join(target_dir, "audio_alerts")
     if os.path.exists(src_audio):
-        print(f"[*] Dang sao chep audio_alerts sang: {dst_audio}")
+        print(f"[*] Đang sao chép audio_alerts sang: {dst_audio}")
         if os.path.exists(dst_audio):
             shutil.rmtree(dst_audio)
         shutil.copytree(
@@ -67,7 +73,7 @@ def build():
             ignore=shutil.ignore_patterns("*.py", "*.pyc", "__pycache__", ".git*")
         )
 
-    # 5. Sao chep ffmpeg.exe sang dist/RailwaySafety/ de ho tro chuyen doi video chuan web H.264
+    # 5. Sao chép ffmpeg.exe sang dist/RailwaySafety/ để hỗ trợ chuyển đổi video chuẩn web H.264
     src_ffmpeg = os.path.join(base_dir, "ffmpeg.exe")
     dst_ffmpeg = os.path.join(target_dir, "ffmpeg.exe")
     if not os.path.exists(src_ffmpeg):
@@ -84,46 +90,47 @@ def build():
             src_ffmpeg = cand
 
     if src_ffmpeg and os.path.exists(src_ffmpeg):
-        print(f"[*] Dang sao chep ffmpeg.exe sang: {dst_ffmpeg}")
+        print(f"[*] Đang sao chép ffmpeg.exe sang: {dst_ffmpeg}")
         shutil.copy2(src_ffmpeg, dst_ffmpeg)
     else:
-        print("[!] CANH BAO: Khong tim thay ffmpeg.exe de sao chep vao goi phan phoi!")
+        print("[!] CẢNH BÁO: Không tìm thấy ffmpeg.exe để sao chép vào gói phân phối!")
 
-    # 5.5 Kiem tra va tu dong tai vc_redist.x64.exe neu thieu (phuc vu tao bo cai Inno Setup)
+    # 5.5 Kiểm tra và tự động tải vc_redist.x64.exe nếu thiếu (phục vụ tạo bộ cài Inno Setup)
     vc_path = os.path.join(base_dir, "vc_redist.x64.exe")
     if not os.path.exists(vc_path):
-        print("[*] Dang tai vc_redist.x64.exe tu Microsoft cho Inno Setup...")
+        print("[*] Đang tải vc_redist.x64.exe từ Microsoft cho Inno Setup...")
         try:
             import urllib.request
             url = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
             urllib.request.urlretrieve(url, vc_path)
-            print("[*] Da tai xong vc_redist.x64.exe!")
+            print("[*] Đã tải xong vc_redist.x64.exe!")
         except Exception as e:
-            print(f"[!] Canh bao: Khong the tu dong tai vc_redist.x64.exe ({e}). Vui long tai thu cong vao thu muc goc neu dung Inno Setup.")
+            print(f"[!] Cảnh báo: Không thể tự động tải vc_redist.x64.exe ({e}). Vui lòng tải thủ công vào thư mục gốc nếu dùng Inno Setup.")
     else:
-        print("[*] vc_redist.x64.exe da san sang cho Inno Setup.")
+        print("[*] vc_redist.x64.exe đã sẵn sàng cho Inno Setup.")
 
-    # 6. Tao cau truc thu muc data/ ngang hang voi RailwaySafety.exe (khong sao chep video cu de tiet kiem dung luong)
+    # 6. Tạo cấu trúc thư mục data/ ngang hàng với RailwaySafety.exe (không sao chép video cũ để tiết kiệm dung lượng)
     dst_data = os.path.join(target_dir, "data")
     dst_recordings = os.path.join(dst_data, "recordings")
     dst_logs = os.path.join(dst_data, "intrusion_logs")
     os.makedirs(dst_recordings, exist_ok=True)
     os.makedirs(dst_logs, exist_ok=True)
-    print(f"[*] Da tao thu muc data ngang hang tai: {dst_data}")
+    print(f"[*] Đã tạo thư mục data ngang hàng tại: {dst_data}")
 
-    # 7. Tao file Khoi_Dong.bat giu lai console de hien thi thong tin va tranh tu dong thoat
+    # 7. Tạo tệp Khoi_Dong.bat giữ lại cửa sổ console để hiển thị thông tin và tránh tự động thoát
     bat_content = f"""@echo off
-title Railway Safety Surveillance System v{APP_VERSION}
+chcp 65001 >nul
+title Hệ Thống Giám Sát An Toàn Đường Sắt v{APP_VERSION}
 cd /d "%~dp0"
 echo ========================================================
-echo    HE THONG GIAM SAT AN TOAN DUONG SAT (v{APP_VERSION})
+echo    HỆ THỐNG GIÁM SÁT AN TOÀN ĐƯỜNG SẮT (v{APP_VERSION})
 echo ========================================================
-echo Dang khoi chay he thong...
+echo Đang khởi chạy hệ thống...
 RailwaySafety.exe
 if %ERRORLEVEL% NEQ 0 (
     echo.
     echo ========================================================
-    echo [THONG BAO] Chuong trinh da dung lai voi ma: %ERRORLEVEL%
+    echo [THÔNG BÁO] Chương trình đã dừng lại với mã lỗi: %ERRORLEVEL%
     echo ========================================================
     pause
 )
@@ -132,27 +139,27 @@ if %ERRORLEVEL% NEQ 0 (
     with open(bat_path, "w", encoding="utf-8") as f:
         f.write(bat_content)
 
-    # 8. Tao file README_HUONG_DAN.txt cho nguoi dung cuoi
+    # 8. Tạo tệp README_HUONG_DAN.txt cho người dùng cuối
     readme_content = f"""========================================================================
-   HE THONG GIAM SAT AN TOAN DUONG SAT VA CANH BAO VI PHAM (V{APP_VERSION})
+   HỆ THỐNG GIÁM SÁT AN TOÀN ĐƯỜNG SẮT VÀ CẢNH BÁO VI PHẠM (V{APP_VERSION})
 ========================================================================
 
-1. CACH KHOI DONG:
-   - Click dup vao file "Khoi_Dong.bat" hoac "RailwaySafety.exe".
-   - May chu se tu dong khoi chay va mo trinh duyet tai: http://127.0.0.1:5000/
-   - Cua so Console duoc giu lai de theo doi trang thai va log he thong.
+1. CÁCH KHỞI ĐỘNG:
+   - Nhấp đúp vào tệp "Khoi_Dong.bat" hoặc "RailwaySafety.exe".
+   - Máy chủ sẽ tự động khởi chạy và mở trình duyệt tại: http://127.0.0.1:5000/
+   - Cửa sổ Console được giữ lại để theo dõi trạng thái và nhật ký hệ thống.
 
-2. XEM VIDEO VA LICH SU VI PHAM TRUC TIEP TREN MAY:
-   - Thu muc "data" nam ngay canh file "RailwaySafety.exe".
-   - Video vi pham: nam tai "data/recordings/{{ngay-thang-nam}}/"
-     -> Ban co the mo truc tiep bang Windows Media Player / VLC / Movies & TV.
-   - Nhat ky su kien vi pham: nam tai "data/intrusion_logs/Lich_su_{{ngay-thang-nam}}.txt".
+2. XEM VIDEO VÀ LỊCH SỬ VI PHẠM TRỰC TIẾP TRÊN MÁY:
+   - Thư mục "data" nằm ngay cạnh tệp "RailwaySafety.exe".
+   - Video vi phạm: nằm tại "data/recordings/{{ngày-tháng-năm}}/"
+     -> Bạn có thể mở trực tiếp bằng Windows Media Player / VLC / Movies & TV.
+   - Nhật ký sự kiện vi phạm: nằm tại "data/intrusion_logs/Lich_su_{{ngày-tháng-năm}}.txt".
 
-3. XEM TREN GIAO DIEN WEB:
-   - Truy cap muc "Lich su" tren thanh menu trai de xem video va danh sach truc tiep tren web.
+3. XEM TRÊN GIAO DIỆN WEB:
+   - Truy cập mục "Lịch sử" trên thanh menu trái để xem video và danh sách trực tiếp trên web.
 
-4. CAU HINH:
-   - Cac thiet lap vung ROI, nguong tin cay, va camera duoc luu tai thu muc "configs/".
+4. CẤU HÌNH:
+   - Các thiết lập vùng ROI, ngưỡng tin cậy và camera được lưu tại thư mục "configs/".
 ========================================================================
 """
     readme_path = os.path.join(target_dir, "README_HUONG_DAN.txt")
@@ -160,7 +167,7 @@ if %ERRORLEVEL% NEQ 0 (
         f.write(readme_content)
 
     print("\n" + "=" * 70)
-    print("   DONG GOI THANH CONG! SAN PHAM PHAN PHOI SAN SANG TAI:")
+    print("   ĐÓNG GÓI THÀNH CÔNG! SẢN PHẨM PHÂN PHỐI SẴN SÀNG TẠI:")
     print(f"   {target_dir}")
     print("=" * 70)
 

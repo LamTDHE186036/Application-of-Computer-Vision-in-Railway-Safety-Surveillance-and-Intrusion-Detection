@@ -29,7 +29,7 @@
 - **Cố định duy nhất kiến trúc YOLO26s:** Sử dụng duy nhất mô hình **YOLO26s** huấn luyện tối ưu trên tập dữ liệu an toàn đường sắt, mang lại độ nhạy (Recall) cao và độ chính xác tổng thể vượt trội.
 - **Theo dõi quỹ đạo và đo đếm dừng đỗ (ByteTrack & Dwell Time):** Tích hợp giải thuật ByteTrack duy trì định danh (Track ID) ổn định, đếm thời gian lưu trú liên tục ngay cả khi đối tượng bị che khuất tạm thời.
 - **Hai chế độ vận hành chuyên biệt:**
-  - *Chế độ "Tàu sắp tới" (`train_approaching`):* Trạng thái nguy cấp, cảnh báo tức thì khi có người hoặc phương tiện bước vào vùng nguy hiểm ($\ge 0.5$ giây xác nhận chống nhiễu).
+  - *Chế độ "Tàu sắp tới" (`train_approaching`):* Trạng thái nguy cấp, cảnh báo tức thì khi có người hoặc phương tiện bước vào vùng nguy hiểm (≥ 0.5 giây xác nhận chống nhiễu).
   - *Chế độ "Không có tàu" (`no_train`):* Giám sát chống dừng đỗ trái phép và kẹt xe trên đường ray, chỉ cảnh báo khi phương tiện dừng đỗ vượt quá thời gian cài đặt (*Dwell Time*, mặc định `5.0` giây).
 - **Hệ thống âm thanh cảnh báo tự động:** Tự động phát giọng nói cảnh báo tiếng Việt tương ứng với từng chế độ (`tausaptoi.mp3` và `khongcotau.mp3`).
 - **Hộp đen bằng chứng và lớp phủ Spotlight:** Ghi hình không phá hủy (Clean Video) kèm tệp siêu dữ liệu JSON đồng bộ từng khung hình, cho phép xem lại từng đối tượng vi phạm với hiệu ứng khoét sáng (Spotlight), làm tối nền xung quanh và tự động tua đến đúng khoảnh khắc xâm phạm.
@@ -203,8 +203,8 @@ RailSafe-CV/
 │
 ├── research/                        # Nhật ký và trọng số huấn luyện mô hình
 │   └── finetune/
-│       ├── train_yolo11s_all/       # Kết quả huấn luyện YOLO11s
-│       └── train_yolo26s_all/       # Kết quả huấn luyện YOLO26s (mô hình được chọn)
+│       ├── train_yolo11s/           # Kết quả huấn luyện YOLO11s
+│       └── train_yolo26s/           # Kết quả huấn luyện YOLO26s (mô hình được chọn)
 │
 ├── static/                          # Tài nguyên giao diện tĩnh (CSS, JS)
 │   ├── css/                         # main.css, sidebar-topbar.css, monitor.css, modal.css, history.css
@@ -225,7 +225,7 @@ RailSafe-CV/
 Dự án được xây dựng theo phương pháp luận thực nghiệm chặt chẽ với 3 bài toán nghiên cứu cốt lõi tại thư mục `experiments/` (xem báo cáo chi tiết tại `experiments/README.md`):
 
 ### 5.1. Thực nghiệm 1: So sánh kiến trúc mô hình nhận diện (YOLO11s vs YOLO26s)
-- **Mục tiêu:** Đánh giá chéo **YOLO11s** và **YOLO26s** trên 3 tập dữ liệu kiểm thử độc lập (tổng 405 ảnh gồm `roboflow_crossing`, `rcd_ground`, `rcd_elevated`).
+- **Mục tiêu:** Đánh giá chéo **YOLO11s** và **YOLO26s** trên 3 tập dữ liệu kiểm thử 5 lớp độc lập (tổng **404 ảnh / 1.238 đối tượng** gồm `roboflow_crossing`, `rcd_ground`, `rcd_elevated`).
 - **Lệnh chạy:**
   ```bash
   python experiments/exp1_model_comparison/evaluate_models.py
@@ -234,10 +234,10 @@ Dự án được xây dựng theo phương pháp luận thực nghiệm chặt 
 
 | Mô hình | Precision | Recall | mAP@0.5 | mAP@0.5:0.95 | Latency (ms/ảnh) |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **YOLO11s** (Baseline) | **87.31%** | 65.03% | 73.24% | 47.29% | **64.80 ms** |
-| **YOLO26s** (Đề xuất) | 84.55% | **66.97%** (+1.94%) | **75.18%** (+1.94%) | **48.82%** (+1.53%) | 65.53 ms |
+| **YOLO11s** (Baseline) | 80.60% | 64.42% | 70.14% | 53.21% | **82.06 ms** |
+| **YOLO26s** (Đề xuất) | **81.62%** (+1.02%) | **73.39%** (+8.97%) | **80.24%** (+10.10%) | **61.87%** (+8.66%) | 102.60 ms |
 
-- **Điểm nhấn:** Lớp **Người đi bộ (`person`)** trên YOLO26s đạt mAP@0.5 **`80.68%`** so với `75.23%` của YOLO11s (**+5.45%**). Do đó **YOLO26s** được chọn làm mô hình nhận diện nòng cốt duy nhất.
+- **Điểm nhấn:** **YOLO26s** vượt trội hơn YOLO11s trên cả **5/5 lớp** — nổi bật là **Người đi bộ (`person`)** đạt mAP@0.5 **`87.68%`** (`+3.99%`), **Đoàn tàu (`train`)** đạt **`81.06%`** (`+27.12%`) và **Xe tải/Xe buýt (`truck-bus`)** đạt **`70.79%`** (`+13.64%`). Do đó **YOLO26s** được chọn làm mô hình nhận diện nòng cốt duy nhất.
 
 ### 5.2. Thực nghiệm 2: Đánh giá giải thuật theo dõi đa đối tượng (MOT)
 - **Mục tiêu:** So sánh `Pure YOLO`, `BoT-SORT / DeepSORT` và `ByteTrack` trên video đường ngang thực tế về độ trễ, chi phí phát sinh (Overhead) và khả năng duy trì định danh (ID).
@@ -262,7 +262,7 @@ Dự án được xây dựng theo phương pháp luận thực nghiệm chặt 
   ```
 - **Kết quả đo đạc (Intel Core i5-1135G7 @ 2.40GHz, Intel Iris Xe Graphics, RAM 16 GB):**
 
-| Cấu hình Mô hình | Thiết bị | Độ trễ TB | P95 Latency | Tốc độ (FPS) | Tăng tốc | Chuẩn Real-Time ($\ge 30$ FPS) |
+| Cấu hình Mô hình | Thiết bị | Độ trễ TB | P95 Latency | Tốc độ (FPS) | Tăng tốc | Chuẩn Real-Time (≥ 30 FPS) |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
 | **PyTorch (`.pt`)** | Intel CPU | 100.13 ms | 130.51 ms | 10.0 FPS | 1.00x (Gốc) | Chưa đạt |
 | **Intel OpenVINO (`.xml`)** | Intel CPU | 249.29 ms | 330.78 ms | 4.0 FPS | 0.40x | Chưa đạt |
@@ -321,7 +321,7 @@ Giao diện người dùng được thiết kế theo dạng Single Page Applica
    - Khung hình đầu tiên sẽ hiển thị làm ảnh xem trước để vẽ vùng nguy hiểm (ROI) trước khi chạy AI.
 2. **Live View (Camera trực tiếp / OBS Virtual Camera):**
    - Chọn tab **Live View**, hệ thống tự động kết nối camera đang cấu hình và hiển thị tên thiết bị (`Cổng X: Tên thiết bị`).
-   - Để đổi cổng camera: mở **Cài đặt** $\rightarrow$ mục **4. Nguồn Camera Live Stream (Webcam / USB / OBS)** $\rightarrow$ nhấn **Quét lại** (nếu vừa cắm camera mới) $\rightarrow$ chọn cổng mong muốn $\rightarrow$ **Lưu cấu hình** (áp dụng ngay lập tức không cần tải lại trang).
+   - Để đổi cổng camera: mở **Cài đặt** → mục **4. Nguồn Camera Live Stream (Webcam / USB / OBS)** → nhấn **Quét lại** (nếu vừa cắm camera mới) → chọn cổng mong muốn → **Lưu cấu hình** (áp dụng ngay lập tức không cần tải lại trang).
 
 > **Mẹo dùng OBS Virtual Camera:** Trong OBS Studio, thêm nguồn là **Media Source** hoặc **Window Capture** (tránh chọn *Display Capture* để không bị lặp màn hình), sau đó nhấn **Start Virtual Camera**.
 

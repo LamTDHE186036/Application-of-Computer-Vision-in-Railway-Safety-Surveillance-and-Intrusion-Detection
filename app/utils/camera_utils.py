@@ -117,7 +117,7 @@ def get_system_cameras():
                         if hr_bag == 0 and pPropBag:
                             propBag = cast(pPropBag, POINTER(IPropertyBag))
                             var = VARIANT()
-                            var.vt = 8 # VT_BSTR
+                            var.vt = 8  # Kiểu chuỗi BSTR (VT_BSTR)
                             if propBag.contents.lpVtbl.contents.Read(pPropBag, 'FriendlyName', byref(var), None) == 0:
                                 name = ctypes.wstring_at(var.bstrVal)
                             propBag.contents.lpVtbl.contents.Release(pPropBag)

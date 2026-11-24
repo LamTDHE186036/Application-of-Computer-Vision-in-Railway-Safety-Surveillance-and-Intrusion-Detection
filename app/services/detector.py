@@ -324,7 +324,7 @@ def _finalize_recording_file(rec_date, end_time_str, save_fps):
             save_recording_metadata(final_filename, save_fps, current_recording_meta)
             convert_video_to_h264_async(final_filename)
         else:
-            print(f"[!] Canh bao: Khong the doi ten video tu {temp_video_filename} sang {final_filename}")
+            print(f"[!] Cảnh báo: Không thể đổi tên video từ {temp_video_filename} sang {final_filename}")
         current_recording_meta.clear()
 
 def process_and_draw(frame, results, fps, stream_type="obs", current_time=None, current_dt=None, base_video_datetime=None):
@@ -366,7 +366,10 @@ def process_and_draw(frame, results, fps, stream_type="obs", current_time=None, 
                 if obj_name not in config.selected_classes and obj_name != "train":
                     continue
 
-            track_id = str(int(box.id[0])) if box.id is not None else "?"
+            # Bỏ qua các phát hiện chưa được ByteTrack cấp ID (lọc nhiễu chớp thoáng qua)
+            if box.id is None:
+                continue
+            track_id = str(int(box.id[0]))
 
             # Nếu là Tàu hỏa: Tàu lưu thông hợp lệ trên ray, KHÔNG vẽ bbox, KHÔNG lưu sự kiện, KHÔNG cảnh báo vi phạm
             if obj_name == "train":
@@ -506,7 +509,7 @@ def process_and_draw(frame, results, fps, stream_type="obs", current_time=None, 
                     rec_date = recording_start_date_str if recording_start_date_str else date_str
                     _finalize_recording_file(rec_date, file_time_str, rec_fps)
             except Exception as e_rec:
-                print(f"[!] Canh bao khi dong goi video vi pham: {e_rec}")
+                print(f"[!] Cảnh báo khi đóng gói video vi phạm: {e_rec}")
                 current_recording_meta.clear()
 
     # Ghi frame sạch hiện tại vào video nếu đang ghi, hoặc lưu vào pre_roll_buffer nếu chưa ghi
@@ -661,7 +664,7 @@ def generate_frames(stream_type):
                                 tracker="bytetrack.yaml"
                             )
                         except Exception as e2:
-                            print(f"[!] AI track error: {e2}")
+                            print(f"[!] Lỗi theo dõi đối tượng AI (tracker): {e2}")
                             results = None
 
                     try:
@@ -671,7 +674,7 @@ def generate_frames(stream_type):
                         )
                         config.latest_data[stream_type] = {"text": html_text, "alarm": has_danger}
                     except Exception as e_proc:
-                        print(f"[!] Canh bao loi xu ly AI (da cach ly an toan): {e_proc}")
+                        print(f"[!] Cảnh báo lỗi xử lý AI (đã cách ly an toàn): {e_proc}")
                         res_img = draw_roi(frame.copy())
                         cv2.putText(res_img, f"{current_dt.strftime('%d-%m-%Y %H:%M:%S')}", (15, 35), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
             else:

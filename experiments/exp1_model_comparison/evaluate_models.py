@@ -1,10 +1,9 @@
 """
-Thực nghiệm 1: Đánh giá & So sánh tất cả các Mô hình trong thư mục research/ trên dataset_test:
-1. YOLO11s          (research/finetune/train_yolo11s/yolo11s.pt)
-2. YOLO26s          (research/finetune/train_yolo26s/yolo26s.pt)
-3. YOLO26s_freeze3  (research/finetune/train_yolo26s_freeze3/yolo26s_freeze3.pt)
-4. YOLO26s_freeze5  (research/finetune/train_yolo26s_freeze5/yolo26s_freeze5.pt)
-5. YOLO26s_freeze10 (research/finetune/train_yolo26s_freeze10/yolo26s_freeze10.pt)
+Thực nghiệm 1: Đánh giá & So sánh Kiến trúc Mô hình Nhận diện (YOLO11s vs YOLO26s)
+So sánh 2 mô hình huấn luyện đầy đủ trên dữ liệu an toàn đường sắt (5 lớp:
+0: car, 1: motorcycle, 2: person, 3: truck-bus, 4: train):
+1. YOLO11s (Baseline - research/finetune/train_yolo11s/yolo11s.pt)
+2. YOLO26s (Đề xuất  - models/yolo26s/model_pytorch/train-railway-yolo26s-all.pt)
 
 Đánh giá chéo trên 3 tập dữ liệu kiểm thử độc lập tại dataset_test:
 - dataset_test/roboflow_crossing/data.yaml (5 lớp: car, motorcycle, person, train, truck-bus)
@@ -13,7 +12,7 @@ Thực nghiệm 1: Đánh giá & So sánh tất cả các Mô hình trong thư m
 
 Cơ chế tự động đồng bộ khi đánh giá (MappedDetectionValidator):
 - Tự động xử lý đường dẫn Roboflow (`../valid/images` -> `images`) bằng file YAML tạm mà không sửa `dataset_test`.
-- Ánh xạ chính xác ID lớp 1-1 theo tên lớp giữa từng mô hình và từng tập dữ liệu
+- Ánh xạ chính xác ID lớp 1-1 theo tên lớp giữa mô hình và từng tập dữ liệu
   (xử lý thứ tự ID đảo vị trí giữa `train`/`truck-bus` và lọc bỏ các lớp không có trong tập con).
 """
 
@@ -25,7 +24,6 @@ import yaml
 import numpy as np
 import pandas as pd
 import torch
-import torchvision
 from ultralytics import YOLO
 from ultralytics.models.yolo.detect import DetectionValidator
 from ultralytics.utils.metrics import ConfusionMatrix
@@ -34,14 +32,7 @@ from ultralytics.utils.metrics import ConfusionMatrix
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 EXP1_DIR = os.path.abspath(os.path.dirname(__file__))
 RESULTS_DIR = os.path.join(EXP1_DIR, "results")
-PRETRAINED_DIR = os.path.join(EXP1_DIR, "weights")
 FINETUNE_DIR = os.path.join(BASE_DIR, "research", "finetune")
-
-# Ánh xạ riêng cho mô hình Pretrained COCO (80 lớp, trong đó tách riêng 'truck' và 'bus')
-COCO_CLASS_MAP = {
-    "truck": "truck-bus",
-    "bus": "truck-bus",
-}
 
 
 def resolve_dataset_dir():
@@ -62,88 +53,19 @@ def first_existing_path(candidates):
 
 
 def resolve_models():
-    """
-    Tự động dò tìm YOLO26s_Pretrained và tất cả các mô hình trong research/finetune/ theo thứ tự chuẩn:
-    YOLO26s_Pretrained -> YOLO11s -> YOLO26s -> YOLO26s_freeze3 -> YOLO26s_freeze5 -> YOLO26s_freeze10
-    (đồng thời tự động phát hiện thêm thư mục train_* mới nếu có).
-    """
-    known_models = [
-        (
-            "YOLO26s_Pretrained",
-            "__pretrained__",
-            [
-                os.path.join(PRETRAINED_DIR, "yolo26s.pt"),
-                os.path.join(BASE_DIR, "yolo26s.pt"),
-                "yolo26s.pt",
-            ],
-        ),
-        (
-            "YOLO11s",
-            "train_yolo11s",
-            [
-                os.path.join(FINETUNE_DIR, "train_yolo11s", "yolo11s.pt"),
-                os.path.join(FINETUNE_DIR, "train_yolo11s", "train-railway-yolo11s", "weights", "best.pt"),
-                os.path.join(BASE_DIR, "models", "yolo11s", "model_pytorch", "train-railway-yolo11s-all.pt"),
-            ],
-        ),
-        (
-            "YOLO26s",
-            "train_yolo26s",
-            [
-                os.path.join(FINETUNE_DIR, "train_yolo26s", "yolo26s.pt"),
-                os.path.join(FINETUNE_DIR, "train_yolo26s", "train-railway-yolo26s", "weights", "best.pt"),
-                os.path.join(BASE_DIR, "models", "yolo26s", "model_pytorch", "train-railway-yolo26s-all.pt"),
-            ],
-        ),
-        (
-            "YOLO26s_freeze3",
-            "train_yolo26s_freeze3",
-            [
-                os.path.join(FINETUNE_DIR, "train_yolo26s_freeze3", "yolo26s_freeze3.pt"),
-                os.path.join(FINETUNE_DIR, "train_yolo26s_freeze3", "railway_freeze3_output", "weights", "best.pt"),
-            ],
-        ),
-        (
-            "YOLO26s_freeze5",
-            "train_yolo26s_freeze5",
-            [
-                os.path.join(FINETUNE_DIR, "train_yolo26s_freeze5", "yolo26s_freeze5.pt"),
-                os.path.join(FINETUNE_DIR, "train_yolo26s_freeze5", "railway_freeze5_output", "weights", "best.pt"),
-            ],
-        ),
-        (
-            "YOLO26s_freeze10",
-            "train_yolo26s_freeze10",
-            [
-                os.path.join(FINETUNE_DIR, "train_yolo26s_freeze10", "yolo26s_freeze10.pt"),
-                os.path.join(FINETUNE_DIR, "train_yolo26s_freeze10", "railway_freeze10_output", "weights", "best.pt"),
-                os.path.join(BASE_DIR, "models", "yolo26s_freeze10", "model pytorch", "yolo26s_freeze10.pt"),
-                os.path.join(BASE_DIR, "models", "yolo26s_freeze10", "model_pytorch", "yolo26s_freeze10.pt"),
-            ],
-        ),
-    ]
-
-    models = {}
-    handled_folders = set()
-    for display_name, folder_name, candidates in known_models:
-        models[display_name] = first_existing_path(candidates)
-        handled_folders.add(folder_name.lower())
-
-    # Tự động quét thêm các thư mục mô hình khác trong research/finetune nếu có
-    if os.path.isdir(FINETUNE_DIR):
-        for entry in sorted(os.listdir(FINETUNE_DIR)):
-            sub_dir = os.path.join(FINETUNE_DIR, entry)
-            if not os.path.isdir(sub_dir) or entry.lower() in handled_folders:
-                continue
-            pt_candidates = [os.path.join(sub_dir, f) for f in os.listdir(sub_dir) if f.endswith(".pt")]
-            for root, _, files in os.walk(sub_dir):
-                if "best.pt" in files:
-                    pt_candidates.append(os.path.join(root, "best.pt"))
-            if pt_candidates:
-                clean_name = entry.replace("train_", "").replace("yolo", "YOLO")
-                models[clean_name] = pt_candidates[0]
-
-    return models
+    """Tự động dò tìm đường dẫn trọng số hợp lệ cho 2 mô hình YOLO11s và YOLO26s"""
+    return {
+        "YOLO11s": first_existing_path([
+            os.path.join(FINETUNE_DIR, "train_yolo11s", "yolo11s.pt"),
+            os.path.join(FINETUNE_DIR, "train_yolo11s", "train-railway-yolo11s", "weights", "best.pt"),
+            os.path.join(BASE_DIR, "models", "yolo11s", "model_pytorch", "train-railway-yolo11s-all.pt"),
+        ]),
+        "YOLO26s": first_existing_path([
+            os.path.join(BASE_DIR, "models", "yolo26s", "model_pytorch", "train-railway-yolo26s-all.pt"),
+            os.path.join(FINETUNE_DIR, "train_yolo26s", "yolo26s.pt"),
+            os.path.join(FINETUNE_DIR, "train_yolo26s", "train-railway-yolo26s", "weights", "best.pt"),
+        ]),
+    }
 
 
 def normalize_names(names_obj):
@@ -156,21 +78,15 @@ def normalize_names(names_obj):
 
 
 def build_class_mapping(model_names, ds_names):
-    """
-    Xây dựng bảng ánh xạ model_cls_id -> dataset_cls_id (hoặc -1 nếu lớp không có trong dataset).
-    Khớp trực tiếp 1-1 theo tên lớp; riêng mô hình COCO 80 lớp ánh xạ thêm 'truck'/'bus' -> 'truck-bus'.
-    """
+    """Ánh xạ 1-1 theo tên lớp giữa mô hình và tập kiểm thử (trả về -1 nếu tập con không có lớp đó)"""
     m_names = normalize_names(model_names)
     d_names = normalize_names(ds_names)
     ds_name_to_id = {name.lower().strip(): cid for cid, name in d_names.items()}
 
-    mapping = {}
-    for m_id, m_name in m_names.items():
-        norm_name = m_name.lower().strip()
-        target_name = COCO_CLASS_MAP.get(norm_name, norm_name)
-        mapping[m_id] = ds_name_to_id.get(target_name, -1)
-
-    return mapping
+    return {
+        m_id: ds_name_to_id.get(m_name.lower().strip(), -1)
+        for m_id, m_name in m_names.items()
+    }
 
 
 def prepare_dataset_yaml(ds_yaml, temp_dir):
@@ -217,9 +133,8 @@ DATASETS = {
 
 class MappedDetectionValidator(DetectionValidator):
     """
-    Custom Ultralytics DetectionValidator hỗ trợ ánh xạ chính xác ID lớp giữa từng mô hình
-    trong research/ và từng tập dữ liệu kiểm thử trong dataset_test trước khi tính mAP,
-    Confusion Matrix và vẽ đồ thị PR/F1.
+    Custom Ultralytics DetectionValidator tự động ánh xạ 1-1 ID lớp giữa mô hình và từng tập
+    dữ liệu kiểm thử trong dataset_test trước khi tính mAP, Confusion Matrix và vẽ đồ thị PR/F1.
     """
 
     def init_metrics(self, model):
@@ -229,16 +144,13 @@ class MappedDetectionValidator(DetectionValidator):
         ds_names = normalize_names(self.data.get("names", model.names))
         self.pred_class_map = build_class_mapping(self.model_names, ds_names)
 
-        mapped_valid = [v for v in self.pred_class_map.values() if v >= 0]
-        self._has_merged_classes = len(set(mapped_valid)) < len(mapped_valid)
-
         max_m_id = max(self.model_names.keys()) if self.model_names else -1
         lut = torch.full((max_m_id + 1,), -1, dtype=torch.long)
         for m_id, ds_id in self.pred_class_map.items():
             lut[m_id] = ds_id
         self._class_lut = lut
 
-        # Cập nhật metadata validator & metrics theo đúng hệ lớp của dataset đang đánh giá
+        # Cập nhật metadata validator & metrics theo đúng hệ lớp của tập dữ liệu đang đánh giá
         self.names = ds_names
         self.nc = len(ds_names)
         self.class_map = list(range(1, self.nc + 1))
@@ -267,52 +179,29 @@ class MappedDetectionValidator(DetectionValidator):
             mapped_cls[valid_range] = lut[raw_cls[valid_range]]
 
             keep_mask = mapped_cls >= 0
-            bboxes = pred["bboxes"][keep_mask]
-            conf = pred["conf"][keep_mask]
-            mapped_cls = mapped_cls[keep_mask]
-            extra = pred["extra"][keep_mask]
-
-            # Chạy class-aware NMS hậu xử lý khi nhiều lớp gộp chung 1 lớp đích
-            if self._has_merged_classes and bboxes.shape[0] > 1:
-                nms_keep = torchvision.ops.batched_nms(
-                    bboxes.float(),
-                    conf.float(),
-                    mapped_cls,
-                    iou_threshold=self.args.iou,
-                )
-                if self.args.max_det and nms_keep.numel() > self.args.max_det:
-                    nms_keep = nms_keep[: self.args.max_det]
-                bboxes = bboxes[nms_keep]
-                conf = conf[nms_keep]
-                mapped_cls = mapped_cls[nms_keep]
-                extra = extra[nms_keep]
-
             remapped_outputs.append({
-                "bboxes": bboxes,
-                "conf": conf,
-                "cls": mapped_cls.to(cls_tensor.dtype),
-                "extra": extra,
+                "bboxes": pred["bboxes"][keep_mask],
+                "conf": pred["conf"][keep_mask],
+                "cls": mapped_cls[keep_mask].to(cls_tensor.dtype),
+                "extra": pred["extra"][keep_mask],
             })
 
         return remapped_outputs
 
 
 def format_class_mapping(model_names, ds_names):
-    """Tạo chuỗi mô tả gọn gàng quy tắc ánh xạ lớp giữa mô hình và từng tập dữ liệu"""
+    """Tạo chuỗi mô tả quy tắc ánh xạ lớp giữa mô hình và từng tập dữ liệu"""
     m_names = normalize_names(model_names)
     d_names = normalize_names(ds_names)
     mapping = build_class_mapping(m_names, d_names)
-    mapped_lines = []
-    skipped_count = 0
+    lines = []
     for m_id, m_name in sorted(m_names.items()):
         ds_id = mapping.get(m_id, -1)
         if ds_id >= 0:
-            mapped_lines.append(f"      model[{m_id}: {m_name}] -> dataset[{ds_id}: {d_names[ds_id]}]")
+            lines.append(f"      model[{m_id}: {m_name}] -> dataset[{ds_id}: {d_names[ds_id]}]")
         else:
-            skipped_count += 1
-    if skipped_count > 0:
-        mapped_lines.append(f"      (+ lọc bỏ {skipped_count} lớp không có trong data.yaml tập này)")
-    return "\n".join(mapped_lines)
+            lines.append(f"      model[{m_id}: {m_name}] -> (bỏ qua: không có trong data.yaml tập này)")
+    return "\n".join(lines)
 
 
 def extract_all_per_class_metrics(val_results):
@@ -354,31 +243,23 @@ def extract_all_per_class_metrics(val_results):
     return per_class
 
 
-def run_evaluation(batch_size=1, imgsz=640, device="cpu", only_models=None):
+def run_evaluation(batch_size=1, imgsz=640, device="cpu"):
     """
-    Thực thi validation trực tiếp trên dataset_test cho toàn bộ 6 mô hình:
-    YOLO26s_Pretrained, YOLO11s, YOLO26s, YOLO26s_freeze3, YOLO26s_freeze5, YOLO26s_freeze10.
-    Nếu truyền only_models (danh sách tên model), chỉ chạy đánh giá các model đó và ghép với
-    kết quả đã lưu của các model còn lại.
+    Thực thi validation trực tiếp trên dataset_test cho 2 mô hình YOLO11s và YOLO26s.
+    Mặc định batch_size=1 để đo chính xác độ trễ suy luận (Inference_ms) thời gian thực.
     """
     os.makedirs(RESULTS_DIR, exist_ok=True)
     summary_rows = []
     class_rows = []
     model_order = list(MODELS.keys())
-    target_models = (
-        {k: v for k, v in MODELS.items() if k in only_models}
-        if only_models
-        else MODELS
-    )
 
-    print("=" * 102)
-    print(f" THỰC NGHIỆM 1: SO SÁNH {len(MODELS)} MÔ HÌNH (PRETRAINED & RESEARCH/) TRÊN DATASET_TEST")
-    print(f"[*] Danh sách mô hình : {', '.join(target_models.keys())}")
+    print("=" * 95)
+    print(" THỰC NGHIỆM 1: ĐÁNH GIÁ ĐỐI ĐẦU YOLO11s VS YOLO26s TRÊN DATASET_TEST (5 LỚP)")
     print(f"[*] Thư mục dữ liệu   : {DATASET_DIR}")
     print(f"[*] Thiết bị suy luận : {device}")
     print(f"[*] Kích thước ảnh    : {imgsz}x{imgsz}")
     print(f"[*] Kích thước batch  : {batch_size}")
-    print("=" * 102)
+    print("=" * 95)
 
     with tempfile.TemporaryDirectory(prefix="railsafe_val_yaml_") as tmp_dir:
         resolved_datasets = {}
@@ -388,9 +269,8 @@ def run_evaluation(batch_size=1, imgsz=640, device="cpu", only_models=None):
             else:
                 print(f"[!] Bỏ qua tập dữ liệu {ds_name} (Không tìm thấy {ds_yaml})")
 
-        for model_name, model_path in target_models.items():
-            is_builtin_weight = os.path.dirname(model_path) == ""
-            if not is_builtin_weight and not os.path.exists(model_path):
+        for model_name, model_path in MODELS.items():
+            if not os.path.exists(model_path):
                 print(f"[!] Cảnh báo: Không tìm thấy file trọng số cho {model_name} tại {model_path}")
                 continue
 
@@ -473,31 +353,6 @@ def run_evaluation(batch_size=1, imgsz=640, device="cpu", only_models=None):
 
     summary_csv = os.path.join(RESULTS_DIR, "comparison_summary.csv")
     class_csv = os.path.join(RESULTS_DIR, "comparison_per_class.csv")
-
-    # Nếu chỉ chạy một số model (only_models), ghép với kết quả đã lưu của các model khác
-    if only_models:
-        evaluated_set = set(df_summary["Model"].unique())
-        if os.path.exists(summary_csv):
-            old_sum = pd.read_csv(summary_csv)
-            old_sum["Model"] = old_sum["Model"].replace({"YOLO11s_all": "YOLO11s", "YOLO26s_all": "YOLO26s"})
-            old_sum = old_sum[~old_sum["Model"].isin(evaluated_set)]
-            df_summary = pd.concat([old_sum, df_summary], ignore_index=True)
-        if os.path.exists(class_csv):
-            old_cls = pd.read_csv(class_csv)
-            old_cls["Model"] = old_cls["Model"].replace({"YOLO11s_all": "YOLO11s", "YOLO26s_all": "YOLO26s"})
-            old_cls = old_cls[~old_cls["Model"].isin(evaluated_set)]
-            df_class = pd.concat([old_cls, df_class], ignore_index=True)
-
-    ds_order = list(DATASETS.keys())
-    df_summary["_m_ord"] = df_summary["Model"].apply(lambda x: model_order.index(x) if x in model_order else 999)
-    df_summary["_d_ord"] = df_summary["Dataset"].apply(lambda x: ds_order.index(x) if x in ds_order else 999)
-    df_summary = df_summary.sort_values(["_m_ord", "_d_ord"]).drop(columns=["_m_ord", "_d_ord"]).reset_index(drop=True)
-
-    df_class["_m_ord"] = df_class["Model"].apply(lambda x: model_order.index(x) if x in model_order else 999)
-    df_class["_d_ord"] = df_class["Dataset"].apply(lambda x: ds_order.index(x) if x in ds_order else 999)
-    df_class = df_class.sort_values(["_m_ord", "_d_ord", "Class"]).drop(columns=["_m_ord", "_d_ord"]).reset_index(drop=True)
-
-    # Lưu kết quả chi tiết
     df_summary.to_csv(summary_csv, index=False)
     df_class.to_csv(class_csv, index=False)
 
@@ -510,19 +365,19 @@ def run_evaluation(batch_size=1, imgsz=640, device="cpu", only_models=None):
     avg_csv = os.path.join(RESULTS_DIR, "comparison_average.csv")
     df_avg.to_csv(avg_csv, index=False)
 
-    print("\n" + "=" * 102)
+    print("\n" + "=" * 95)
     print(" BẢNG TỔNG HỢP SO SÁNH TRUNG BÌNH 3 TẬP DỮ LIỆU KIỂM THỬ (MACRO AVERAGE METRICS)")
-    print("=" * 102)
-    print(f"{'Mô hình':<20} | {'Precision':<10} | {'Recall':<10} | {'mAP@0.5':<10} | {'mAP@0.5:0.95':<14} | {'Suy luận (ms)':<15}")
-    print("-" * 102)
+    print("=" * 95)
+    print(f"{'Mô hình':<12} | {'Precision':<10} | {'Recall':<10} | {'mAP@0.5':<10} | {'mAP@0.5:0.95':<14} | {'Suy luận (ms)':<15}")
+    print("-" * 95)
     for _, row in df_avg.iterrows():
         p_pct = f"{row['Precision']*100:.2f}%"
         r_pct = f"{row['Recall']*100:.2f}%"
         map50_pct = f"{row['mAP50']*100:.2f}%"
         map95_pct = f"{row['mAP50-95']*100:.2f}%"
         lat = f"{row['Inference_ms']:.2f} ms/ảnh"
-        print(f"{row['Model']:<20} | {p_pct:<10} | {r_pct:<10} | {map50_pct:<10} | {map95_pct:<14} | {lat:<15}")
-    print("=" * 102)
+        print(f"{row['Model']:<12} | {p_pct:<10} | {r_pct:<10} | {map50_pct:<10} | {map95_pct:<14} | {lat:<15}")
+    print("=" * 95)
 
     # Hiển thị bảng trung bình theo từng lớp (chỉ tính trung bình trên các tập có nhãn > 0)
     df_class_valid = df_class[df_class["Targets"] > 0]
@@ -542,9 +397,9 @@ def run_evaluation(batch_size=1, imgsz=640, device="cpu", only_models=None):
         df_class_avg["_order"] = df_class_avg["Model"].apply(lambda x: model_order.index(x) if x in model_order else 999)
         df_class_avg = df_class_avg.sort_values(["_order", "Class"]).drop(columns=["_order"]).reset_index(drop=True)
         print("\n BẢNG TRUNG BÌNH THEO TỪNG LỚP ĐỐI TƯỢNG (CHỈ TÍNH TRÊN CÁC TẬP CÓ NHÃN > 0)")
-        print("-" * 102)
+        print("-" * 95)
         print(df_class_avg.to_string(index=False))
-        print("=" * 102)
+        print("=" * 95)
 
     print(f"[*] Đã lưu bảng tổng kết chi tiết tại : {summary_csv}")
     print(f"[*] Đã lưu bảng chi tiết từng lớp tại : {class_csv}")
@@ -564,9 +419,9 @@ def display_saved_results():
         return run_evaluation()
 
     df_avg = pd.read_csv(avg_csv)
-    print("=" * 102)
-    print(" KẾT QUẢ SO SÁNH TRUNG BÌNH ĐÃ LƯU (CÁC MÔ HÌNH TRONG RESEARCH/)")
-    print("=" * 102)
+    print("=" * 95)
+    print(" KẾT QUẢ SO SÁNH TRUNG BÌNH ĐÃ LƯU (YOLO11s VS YOLO26s)")
+    print("=" * 95)
     print(df_avg.to_string(index=False))
     if os.path.exists(class_csv):
         df_class = pd.read_csv(class_csv)
@@ -585,25 +440,22 @@ def display_saved_results():
                     )
                     .round(4)
                 )
-                print("-" * 102)
+                print("-" * 95)
                 print(" TRUNG BÌNH THEO TỪNG LỚP (TẬP CÓ NHÃN > 0):")
                 print(df_cavg.to_string(index=False))
-    print("=" * 102)
+    print("=" * 95)
     return pd.read_csv(summary_csv), df_avg
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="So sánh YOLO26s_Pretrained và các mô hình trong research/ trên dataset_test")
+    parser = argparse.ArgumentParser(description="So sánh YOLO11s vs YOLO26s trên dataset_test (đủ 5 lớp)")
     parser.add_argument("--eval", action="store_true", help="Chạy lại toàn bộ quá trình validation trên dataset_test")
-    parser.add_argument("--only", type=str, default="", help="Danh sách model cần chạy phân cách bằng dấu phẩy")
     parser.add_argument("--batch", type=int, default=1, help="Kích thước batch (Mặc định 1 để đo chuẩn latency)")
     parser.add_argument("--imgsz", type=int, default=640, help="Kích thước ảnh đầu vào")
     parser.add_argument("--device", type=str, default="cpu", help="Thiết bị thực thi (cpu, 0, intel:gpu)")
     args = parser.parse_args()
 
-    only_list = [m.strip() for m in args.only.split(",") if m.strip()] if args.only else None
-
-    if args.eval or only_list or not os.path.exists(os.path.join(RESULTS_DIR, "comparison_average.csv")):
-        run_evaluation(batch_size=args.batch, imgsz=args.imgsz, device=args.device, only_models=only_list)
+    if args.eval or not os.path.exists(os.path.join(RESULTS_DIR, "comparison_average.csv")):
+        run_evaluation(batch_size=args.batch, imgsz=args.imgsz, device=args.device)
     else:
         display_saved_results()

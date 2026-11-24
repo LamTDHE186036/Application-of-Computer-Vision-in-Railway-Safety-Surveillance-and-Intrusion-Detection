@@ -1,4 +1,4 @@
-/* ===== MAIN CONTENT ===== */
+/* ===== NỘI DUNG CHÍNH ===== */
 .main-content {
     margin-left: 72px;
     padding: 18px 20px;
@@ -13,7 +13,7 @@
     width: 100%;
 }
 
-/* ===== LEFT PANEL (CONTROLS) ===== */
+/* ===== BẢNG ĐIỀU KHIỂN BÊN TRÁI ===== */
 .control-panel {
     display: flex;
     flex-direction: column;
@@ -50,7 +50,7 @@
     color: #204763;
 }
 
-/* Mode Tabs (AntD Segmented style) */
+/* Thẻ chuyển chế độ (kiểu AntD Segmented) */
 .segmented-group {
     display: flex;
     background: #f1f5f9;
@@ -88,7 +88,7 @@
     color: var(--text-main);
 }
 
-/* Upload Zone */
+/* Vùng tải video lên */
 .upload-section {
     display: none;
 }
@@ -209,7 +209,7 @@
     background: #1e293b;
 }
 
-/* OBS Virtual Camera Box */
+/* Khung chọn camera ảo OBS */
 .obs-card-box {
     display: flex;
     flex-direction: column;
@@ -261,7 +261,7 @@
     text-overflow: ellipsis;
 }
 
-/* ===== ALARM STATUS ===== */
+/* ===== TRẠNG THÁI CẢNH BÁO ===== */
 .alarm-status-box {
     border-radius: var(--radius-md);
     padding: 10px 12px;
@@ -288,7 +288,7 @@
     line-height: 1.3;
 }
 
-/* Alarm states */
+/* Các trạng thái cảnh báo */
 .alarm-safe {
     background: var(--success-bg);
     color: var(--success-text);
@@ -349,7 +349,7 @@
     box-shadow: 0 1px 3px rgba(13, 130, 138, 0.35);
 }
 
-/* ROI Buttons */
+/* Các nút điều khiển vùng ROI */
 .roi-controls {
     display: flex;
     gap: 6px;
@@ -437,7 +437,7 @@
     box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.2);
 }
 
-/* Confidence control */
+/* Điều chỉnh độ tin cậy */
 .conf-badge-input {
     width: 52px;
     text-align: center;
@@ -467,7 +467,7 @@ input[type="range"] {
     cursor: pointer;
 }
 
-/* Action Buttons */
+/* Các nút thao tác chính */
 .main-actions {
     display: flex;
     gap: 10px;
@@ -528,7 +528,7 @@ input[type="range"] {
     display: block;
 }
 
-/* ===== RIGHT AREA (MEDIA & EVENTS) ===== */
+/* ===== KHU VỰC BÊN PHẢI (VIDEO & SỰ KIỆN) ===== */
 .media-column {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 280px;
@@ -600,7 +600,7 @@ input[type="range"] {
     border-color: #fde68a;
 }
 
-/* Camera Box / Media Stage */
+/* Khung hiển thị camera / video */
 .camera-box {
     background: #ffffff;
     position: relative;
@@ -735,7 +735,7 @@ input[type="range"] {
     background: var(--danger);
 }
 
-/* Right Stack */
+/* Khối xếp chồng bên phải */
 .right-stack {
     display: flex;
     flex-direction: column;
@@ -743,7 +743,7 @@ input[type="range"] {
     min-width: 0;
 }
 
-/* Event Card */
+/* Thẻ hiển thị sự kiện */
 .event-card {
     display: flex;
     flex-direction: column;
@@ -846,7 +846,7 @@ input[type="range"] {
     color: #cbd5e1;
 }
 
-/* ===== RESPONSIVE ===== */
+/* ===== GIAO DIỆN ĐÁP ỨNG (RESPONSIVE) ===== */
 @media (max-width: 1200px) {
     #view_monitor {
         grid-template-columns: 1fr;

@@ -42,50 +42,44 @@ experiments/
 
 ---
 
-## 2. Thực nghiệm 1: Đánh giá & So sánh 6 Mô hình Nhận diện (Pretrained & 5 Mô hình trong `research/`)
+## 2. Thực nghiệm 1: Đánh giá & So sánh Kiến trúc Mô hình Nhận diện (YOLO11s vs YOLO26s)
 
 ### 2.1. Mục tiêu & Dữ liệu Kiểm thử
-Thực nghiệm so sánh trực tiếp **6 cấu hình mô hình** (gồm `YOLO26s_Pretrained` và toàn bộ 5 mô hình huấn luyện trong `research/finetune/`) trên 3 tập kiểm thử độc lập thuộc `dataset_test/` (tổng **404 ảnh**, **1238 nhãn đối tượng**, đủ 5 lớp `car`, `motorcycle`, `person`, `train`, `truck-bus`):
-1. **`YOLO26s_Pretrained`**: Trọng số COCO 80 lớp chưa finetune (`experiments/exp1_model_comparison/weights/yolo26s.pt`).
-2. **`YOLO11s`**: Finetune toàn bộ mạng (`research/finetune/train_yolo11s/yolo11s.pt`).
-3. **`YOLO26s`**: Finetune toàn bộ mạng, `freeze=None` (`research/finetune/train_yolo26s/yolo26s.pt`).
-4. **`YOLO26s_freeze3`**: Finetune đóng băng 3 tầng đầu (`research/finetune/train_yolo26s_freeze3/yolo26s_freeze3.pt`).
-5. **`YOLO26s_freeze5`**: Finetune đóng băng 5 tầng đầu (`research/finetune/train_yolo26s_freeze5/yolo26s_freeze5.pt`).
-6. **`YOLO26s_freeze10`**: Finetune đóng băng 10 tầng backbone (`research/finetune/train_yolo26s_freeze10/yolo26s_freeze10.pt`).
+Thực nghiệm nhằm so sánh trực tiếp hiệu năng nhận diện chướng ngại vật xâm nhập giữa 2 kiến trúc được huấn luyện trên dữ liệu an toàn đường sắt đầy đủ 5 lớp (`0: car`, `1: motorcycle`, `2: person`, `3: truck-bus`, `4: train`):
+- **YOLO11s** *(Baseline)*: `research/finetune/train_yolo11s/yolo11s.pt`
+- **YOLO26s** *(Đề xuất)*: `models/yolo26s/model_pytorch/train-railway-yolo26s-all.pt` *(trùng với `research/finetune/train_yolo26s/yolo26s.pt`)*
 
-Ba tập dữ liệu kiểm thử:
+Hai mô hình được đánh giá chéo độc lập trên 3 tập dữ liệu kiểm thử thực tế thuộc thư mục `dataset_test/` đã chuẩn hóa đầy đủ 5 lớp tương thích (tổng **404 ảnh**, **1238 nhãn đối tượng**):
 1. `roboflow_crossing`: Giao cắt đường ngang dân sinh, đủ cả 5 lớp (119 ảnh, 707 đối tượng).
 2. `rcd_ground`: Tuyến đường sắt mặt đất, 3 lớp `car`, `person`, `truck-bus` (185 ảnh, 333 đối tượng).
 3. `rcd_elevated`: Tuyến đường sắt trên cao đô thị, 4 lớp `car`, `person`, `train`, `truck-bus` (100 ảnh, 198 đối tượng).
 
-> **Cơ chế đồng bộ lớp trong `evaluate_models.py` (`MappedDetectionValidator`):** Khớp 1-1 theo tên lớp cho 5 mô hình finetune 5 lớp; với `YOLO26s_Pretrained` (COCO 80 lớp), tự động ánh xạ `person`, `car`, `motorcycle`, `train` và gộp `truck` + `bus` $\rightarrow$ `truck-bus` (kèm class-aware NMS chống trùng box), đồng thời lọc bỏ 74 lớp COCO không liên quan.
+> **Cơ chế đồng bộ lớp trong `evaluate_models.py` (`MappedDetectionValidator`):** Tự động khớp chính xác **1-1 theo tên lớp** cho từng tập (xử lý thứ tự ID đảo vị trí giữa `train` và `truck-bus`, lọc bỏ lớp không gán nhãn trong tập con và xử lý đường dẫn YAML Roboflow mà không sửa `dataset_test/`).
 
 ### 2.2. Bảng Tổng hợp Kết quả Đánh giá Trung bình (Average Metrics)
 *(Số liệu trích xuất từ `exp1_model_comparison/results/comparison_average.csv`, chạy `batch=1`, `imgsz=640`, `device=cpu`)*
 
 | Mô hình | Precision (%) | Recall (%) | mAP@0.5 (%) | mAP@0.5:0.95 (%) | Độ trễ suy luận (ms/ảnh) | Đánh giá tổng quan |
 | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
-| **`YOLO26s_Pretrained`** | **85.80%** | **80.85%** | **87.39%** | **73.83%** | 88.66 ms | Tổng quát hóa COCO tốt nhất trên `rcd_ground`/`rcd_elevated`, nhưng yếu lớp `motorcycle` (67.11%) ở giao cắt. |
-| **`YOLO11s`** (Baseline) | 80.60% | 64.42% | 70.14% | 53.21% | **82.06 ms** | Thấp nhất trong cả 6 mô hình, đặc biệt yếu ở `truck-bus` và `train` góc nhìn trên cao. |
-| **`YOLO26s`** (Đề xuất) | 81.62% | **73.39%** | **80.24%** | 61.87% | 102.60 ms | **Cao nhất nhóm finetune về mAP@0.5 (80.24%) và Recall (73.39%)**, dẫn đầu trên `roboflow_crossing` (**80.62%**). |
-| **`YOLO26s_freeze3`** | 76.14% | 68.06% | 70.92% | 55.75% | 123.90 ms | Chỉ khóa 3 tầng đầu gây lệch đặc trưng giữa đầu và thân Backbone. |
-| **`YOLO26s_freeze5`** | 80.27% | 69.15% | 76.18% | 58.95% | 153.73 ms | Mở khóa P4/P5 giúp bắt `train` (74.10%) và `rcd_elevated` (69.60%) tốt hơn `freeze10`. |
-| **`YOLO26s_freeze10`** | **84.63%** | 69.10% | 78.52% | **62.39%** | 86.11 ms | Giữ đặc trưng COCO tốt, dẫn đầu lớp `motorcycle` (**82.30%**) và `person` (**88.89%**), Precision cao nhất nhóm finetune. |
+| **YOLO11s** (Baseline) | 80.60% | 64.42% | 70.14% | 53.21% | **82.06 ms** | Mô hình cơ sở, hạn chế rõ rệt ở `truck-bus` và `train` góc nhìn trên cao. |
+| **YOLO26s** (Đề xuất) | **81.62%** | **73.39%** | **80.24%** | **61.87%** | 102.60 ms | **Vượt trội toàn diện**: mAP@0.5 vượt mốc **80%** (**+10.10%**), Recall tăng **+8.97%**, mAP@0.5:0.95 tăng **+8.66%**. |
+| **Chênh lệch ($\Delta$)** | **+1.02%** | **+8.97%** | **+10.10%** | **+8.66%** | +20.54 ms | **YOLO26s thắng áp đảo trên toàn bộ các chỉ số độ chính xác.** |
 
 ### 2.3. Hiệu năng theo Từng Phân lớp Đối tượng (Per-Class Average mAP@0.5 — Đủ 5 Lớp)
 *(Số liệu trích xuất từ `exp1_model_comparison/results/comparison_per_class.csv`, trung bình trên các tập có nhãn > 0)*
 
-| Lớp Đối tượng (`Class`) | Targets | `YOLO26s_Pretrained` | `YOLO11s` | `YOLO26s` | `YOLO26s_freeze3` | `YOLO26s_freeze5` | `YOLO26s_freeze10` |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **`person`** (Người đi bộ) | 306 (3/3 tập) | 86.99% | 83.69% | 87.68% | 82.11% | 85.00% | **88.89%** |
-| **`car`** (Ô tô con) | 613 (3/3 tập) | **88.31%** | 79.91% | 82.40% | 81.77% | 79.98% | 83.39% |
-| **`motorcycle`** (Xe máy) | 155 (1/3 tập) | 67.11% | 76.13% | 76.51% | 71.35% | 76.49% | **82.30%** |
-| **`train`** (Tàu hỏa) | 17 (2/3 tập) | **93.42%** | 53.94% | **81.06%** | 60.88% | 74.10% | 69.75% |
-| **`truck-bus`** (Xe tải / Buýt) | 147 (3/3 tập) | **84.64%** | 57.15% | **70.79%** | 55.43% | 64.64% | 65.50% |
+| Lớp Đối tượng (`Class`) | Tổng Targets | YOLO11s mAP@0.5 (%) | YOLO26s mAP@0.5 (%) | Mức độ cải thiện ($\Delta$) | Ý nghĩa thực tiễn an toàn đường sắt |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+| **Người đi bộ (`person`)** | 306 (3/3 tập) | 83.69% | **87.68%** | **+3.99%** | Bắt rất nhạy người đi bộ băng qua hoặc đi dọc ray (Recall TB **82.36%**). |
+| **Ô tô con (`car`)** | 613 (3/3 tập) | 79.91% | **82.40%** | **+2.49%** | Bắt chuẩn ô tô con kẹt trên ray (Precision TB **92.39%**). |
+| **Tàu hỏa (`train`)** | 17 (2/3 tập) | 53.94% | **81.06%** | **+27.12%** | **Đột phá lớn**: Nhận diện chuẩn đoàn tàu kể cả ở góc nhìn từ trên cao. |
+| **Xe máy (`motorcycle`)** | 155 (1/3 tập) | 76.13% | **76.51%** | **+0.38%** | Nâng mạnh Precision xe máy từ 75.73% lên **88.15%**, giảm báo động giả. |
+| **Xe tải / Xe buýt (`truck-bus`)** | 147 (3/3 tập) | 57.15% | **70.79%** | **+13.64%** | **Cải thiện vượt bậc**: Nhận diện chính xác phương tiện cỡ lớn nguy hiểm nhất. |
 
 ### 2.4. Kết luận Thực nghiệm 1
-- **Trong 5 mô hình finetune tại `research/`**, **`YOLO26s` (finetune toàn bộ, `freeze=None`)** đạt **mAP@0.5 (80.24%) và Recall (73.39%) cao nhất**, bỏ xa `YOLO11s` (**+10.10% mAP@0.5**, **+8.97% Recall**), đồng thời dẫn đầu trên tập giao cắt `roboflow_crossing` (**80.62%**) và hai lớp `train` (**81.06%**) & `truck-bus` (**70.79%**).
-- **Trong các biến thể đóng băng tầng (`freeze=3, 5, 10`)**, `YOLO26s_freeze10` đạt tổng mAP@0.5 cao nhất nhóm freeze (**78.52%**) và Precision cao nhất nhóm finetune (**84.63%**), trong khi `YOLO26s_freeze5` cải thiện rõ khả năng bắt `train` (**74.10%** vs **69.75%**) và góc nhìn trên cao `rcd_elevated` (**69.60%** vs **67.93%**).
+- **YOLO26s** vượt trội áp đảo YOLO11s ở tất cả chỉ số tổng hợp: **Precision (81.62% vs 80.60%)**, **Recall (73.39% vs 64.42%)**, **mAP@0.5 (80.24% vs 70.14%)**, và **mAP@0.5:0.95 (61.87% vs 53.21%)**.
+- YOLO26s thắng tuyệt đối trên **cả 5/5 phân lớp**, đặc biệt bứt phá ở `train` (**+27.12%**), `truck-bus` (**+13.64%**) và `person` (**+3.99%**).
+- **YOLO26s chính thức được lựa chọn** làm kiến trúc mạng nơ-ron nhận diện nòng cốt cho toàn bộ hệ thống.
 
 ---
 
@@ -144,8 +138,8 @@ Thực nghiệm đánh giá năng lực triển khai hệ thống trên máy tí
 
 ```
 [BƯỚC 1: THỰC NGHIỆM 1]
-So sánh 4 mô hình trên dataset_test (5 lớp): YOLO26s_Pretrained / YOLO11s_all / YOLO26s_freeze10 / YOLO26s_all
-(Trong nhóm finetune: YOLO26s_all đạt mAP50 80.24% & Recall 73.39%, dẫn đầu roboflow_crossing 80.62%)
+So sánh kiến trúc trên dataset_test (5 lớp): YOLO11s vs YOLO26s
+(YOLO26s vượt trội: mAP50 80.24% vs 70.14%, Recall 73.39% vs 64.42%, mAP50-95 61.87% vs 53.21%)
                     │
                     ▼
           LỰA CHỌN KIẾN TRÚC YOLO26

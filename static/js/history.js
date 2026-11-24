@@ -8,7 +8,7 @@ let currentVideoSpeed = 1.0;
 let currentVideoUrl = '';
 
 // ===== BIẾN TOÀN CỤC CHẾ ĐỘ ĐÈN RỌI SPOTLIGHT QUA METADATA =====
-let currentSpotlightMode = 'spotlight'; // 'spotlight' | 'off'
+let currentSpotlightMode = 'spotlight'; // Chế độ hiển thị đèn rọi: 'spotlight' hoặc 'off'
 let currentVideoMetadata = null;
 let currentMetadataUrl = '';
 let currentTrackId = null;

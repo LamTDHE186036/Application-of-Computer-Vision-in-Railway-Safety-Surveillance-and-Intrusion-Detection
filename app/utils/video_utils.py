@@ -105,7 +105,7 @@ def _process_single_video(video_path):
 
     ffmpeg_bin = get_ffmpeg_path()
     if not ffmpeg_bin:
-        print(f"[!] Canh bao: Khong tim thay ffmpeg.exe! Video '{os.path.basename(video_path)}' giu nguyen dinh dang goc.")
+        print(f"[!] Cảnh báo: Không tìm thấy ffmpeg.exe! Video '{os.path.basename(video_path)}' giữ nguyên định dạng gốc.")
         return
 
     tmp_converted = video_path + ".h264.mp4"
@@ -134,7 +134,7 @@ def _process_single_video(video_path):
                 try:
                     os.replace(tmp_converted, video_path)
                     replaced = True
-                    print(f"[*] Da chuyen doi thanh cong video sang chuan web H.264: {os.path.basename(video_path)}")
+                    print(f"[*] Đã chuyển đổi thành công video sang chuẩn web H.264: {os.path.basename(video_path)}")
                     break
                 except (PermissionError, OSError):
                     time.sleep(0.5)
@@ -142,14 +142,14 @@ def _process_single_video(video_path):
             if not replaced:
                 # Nếu file đang bị trình duyệt / Flask mở đọc, KHÔNG XÓA tmp_converted!
                 # Giữ nguyên tmp_converted để route serve_history_video tự động phục vụ tệp H.264 này
-                print(f"[*] File '{os.path.basename(video_path)}' dang duoc phat, da giu nguyen ban H.264 de tu dong thay the sau.")
+                print(f"[*] Tệp '{os.path.basename(video_path)}' đang được phát, đã giữ nguyên bản H.264 để tự động thay thế sau.")
         elif os.path.exists(tmp_converted):
             try:
                 os.remove(tmp_converted)
             except Exception:
                 pass
     except Exception as e:
-        print(f"[!] Loi khi thuc hien chuyen doi video bang ffmpeg: {e}")
+        print(f"[!] Lỗi khi thực hiện chuyển đổi video bằng ffmpeg: {e}")
         if os.path.exists(tmp_converted):
             try:
                 os.remove(tmp_converted)
@@ -191,7 +191,7 @@ def convert_video_to_h264_async(video_path):
     _video_queue.put(video_path)
     pending = _video_queue.qsize()
     if pending > 1:
-        print(f"[*] Da dua video '{os.path.basename(video_path)}' vao hang doi chuyen doi H.264 (Dang cho: {pending} video).")
+        print(f"[*] Đã đưa video '{os.path.basename(video_path)}' vào hàng đợi chuyển đổi H.264 (Đang chờ: {pending} video).")
 
 def wait_for_video_converter(timeout=30):
     """
@@ -203,19 +203,19 @@ def wait_for_video_converter(timeout=30):
         return
 
     print("\n" + "=" * 65)
-    print("  [*] Dang hoan tat luu cac video cuoi cung, vui long cho vai giay...")
-    print(f"      (Con lai: {total_pending} video can chuyen doi sang H.264)")
+    print("  [*] Đang hoàn tất lưu các video cuối cùng, vui lòng chờ vài giây...")
+    print(f"      (Còn lại: {total_pending} video cần chuyển đổi sang H.264)")
     print("=" * 65)
 
     start_t = time.time()
     while _video_queue.unfinished_tasks > 0 or _is_converting:
         if time.time() - start_t > timeout:
-            print("[!] Canh bao: Het thoi gian cho xu ly video, ung dung se dong.")
+            print("[!] Cảnh báo: Hết thời gian chờ xử lý video, ứng dụng sẽ đóng.")
             break
         time.sleep(0.3)
 
     _stop_worker_signal = True
-    print("[*] Da hoan tat toan bo video trong hang doi.")
+    print("[*] Đã hoàn tất toàn bộ video trong hàng đợi.")
 
 def format_time_str(t, stream_type="obs", base_dt=None):
     """

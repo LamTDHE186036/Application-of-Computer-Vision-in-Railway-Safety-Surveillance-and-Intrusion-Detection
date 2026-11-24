@@ -1,4 +1,4 @@
-/* ===== SIDEBAR ===== */
+/* ===== THANH ĐIỀU HƯỚNG BÊN TRÁI (SIDEBAR) ===== */
 .sidebar {
     width: 72px;
     position: fixed;
@@ -95,7 +95,7 @@
     height: 18px;
 }
 
-/* ===== TOPBAR ===== */
+/* ===== THANH TIÊU ĐỀ PHÍA TRÊN (TOPBAR) ===== */
 .topbar {
     height: 56px;
     position: sticky;

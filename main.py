@@ -1,8 +1,15 @@
+import sys
 import socket
 import multiprocessing
 import webbrowser
 from threading import Timer
 from app import create_app
+
+# Đảm bảo xuất tiếng Việt có dấu ổn định trên cửa sổ dòng lệnh Windows
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 app = create_app()
 
@@ -39,15 +46,15 @@ if __name__ == '__main__':
         _single_instance_mutex = kernel32.CreateMutexW(None, False, "Global\\RailwaySafety_SingleInstance_Mutex")
         if kernel32.GetLastError() == ERROR_ALREADY_EXISTS:
             print("=" * 65)
-            print("  [!] CANH BAO: HE THONG DA DANG CHAY TREN MAY TINH NAY!")
-            print("      Khong the mo 2 phien ban ung dung cung luc.")
+            print("  [!] CẢNH BÁO: HỆ THỐNG ĐÃ ĐANG CHẠY TRÊN MÁY TÍNH NÀY!")
+            print("      Không thể mở 2 phiên bản ứng dụng cùng lúc.")
             print("=" * 65)
             try:
                 ctypes.windll.user32.MessageBoxW(
                     0,
                     "Hệ thống Giám sát An toàn Đường sắt đã đang chạy trên máy tính này!\n\nKhông thể mở đồng thời 2 cửa sổ phần mềm.",
                     "Cảnh Báo - Railway Safety",
-                    0x30  # MB_ICONWARNING
+                    0x30  # Biểu tượng cảnh báo (MB_ICONWARNING)
                 )
             except Exception:
                 pass
@@ -58,9 +65,9 @@ if __name__ == '__main__':
     port = find_available_port(start_port=5000)
 
     print("=" * 65)
-    print("  HE THONG GIAM SAT AN TOAN DUONG SAT (RAILWAY SAFETY) - V1.2.1")
-    print(f"  May chu dang khoi chay tai: http://127.0.0.1:{port}")
-    print("  Thu muc luu video & log: 'data' (nam ngay canh chuong trinh)")
+    print("  HỆ THỐNG GIÁM SÁT AN TOÀN ĐƯỜNG SẮT (RAILWAY SAFETY) - V1.2.1")
+    print(f"  Máy chủ đang khởi chạy tại: http://127.0.0.1:{port}")
+    print("  Thư mục lưu video & nhật ký: 'data' (nằm ngay cạnh chương trình)")
     print("=" * 65)
 
     Timer(1.5, open_browser, args=[port]).start()

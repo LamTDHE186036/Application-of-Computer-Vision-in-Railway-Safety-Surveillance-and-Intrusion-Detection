@@ -1,4 +1,4 @@
-# app/routes/__init__.py
+# Đăng ký các tuyến đường (routes) của ứng dụng Flask
 from app.routes.stream import stream_bp
 from app.routes.history import history_bp
 from app.routes.settings import settings_bp
