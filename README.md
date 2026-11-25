@@ -26,9 +26,9 @@
 Đường ngang giao cắt giữa đường sắt và đường bộ là một trong những điểm nóng tiềm ẩn nguy cơ tai nạn giao thông nghiêm trọng nhất trong mạng lưới đường sắt Việt Nam. Đề tài được nghiên cứu và phát triển nhằm cung cấp giải pháp giám sát tự động, thông minh, vận hành liên tục theo thời gian thực (Real-time) để hỗ trợ điều độ viên và nhân viên gác chắn đường sắt:
 
 - **Tự động nhận diện đa đối tượng (5 lớp đường sắt):** Nhận diện chính xác 4 lớp chướng ngại vật xâm phạm hành lang an toàn (**Người**, **Ô tô**, **Xe máy**, **Xe tải/Xe buýt**), đồng thời nhận diện **Đoàn tàu hỏa** (`train`) để kích hoạt bộ lọc loại trừ thông minh (không vẽ đè khung, không báo động sai lên tàu và tự động thu hồi trạng thái nếu đầu tàu bị nhận nhầm tạm thời).
-- **Chọn mô hình thích ứng phần cứng (`YOLO26m` + `YOLO26s`):**
-  - Tự động kích hoạt **`YOLO26m` (PyTorch CUDA)** trên máy trạm có GPU rời NVIDIA để đạt độ chính xác tối đa (**`85.96%` mAP@0.5**, **`72.47%` mAP@0.5:0.95**).
-  - Tự động kích hoạt **`YOLO26s` (Intel OpenVINO FP16)** trên máy tính văn phòng / Mini-PC dùng Intel Iris Xe iGPU hoặc CPU để đạt tốc độ **Real-Time `30.8 FPS` (`32.51 ms`)** ổn định không giật lag.
+- **Chọn mô hình thích ứng phần cứng (`YOLO26m` + `YOLO26s` — Ưu tiên OpenVINO, dự phòng `.pt`):**
+  - Tự động chọn **`YOLO26m`** trên máy có GPU rời NVIDIA (ưu tiên **OpenVINO FP16**, tự động fallback sang `.pt` nếu OpenVINO lỗi) để đạt độ chính xác tối đa (**`85.96%` mAP@0.5**, **`72.47%` mAP@0.5:0.95**).
+  - Tự động chọn **`YOLO26s`** trên máy không có GPU rời (ưu tiên **OpenVINO FP16** trên Intel Iris Xe iGPU/CPU, tự động fallback sang `.pt` nếu OpenVINO lỗi) để đạt tốc độ **Real-Time `30.8 FPS` (`32.51 ms`)**.
 - **Theo dõi quỹ đạo và đo đếm dừng đỗ (ByteTrack & Dwell Time):** Tích hợp giải thuật ByteTrack siêu nhẹ (`+0.27 ms` overhead trên `YOLO26s`), duy trì định danh (Track ID) bền bỉ khi đối tượng bị che khuất tạm thời.
 - **Hai chế độ vận hành chuyên biệt:**
   - *Chế độ "Tàu sắp tới" (`train_approaching`):* Trạng thái nguy cấp, cảnh báo tức thì khi có người hoặc phương tiện bước vào vùng nguy hiểm ($\ge 0.5$ giây xác nhận chống nhiễu).
@@ -96,8 +96,8 @@ flowchart TD
 
     subgraph INFERENCE ["2. Chọn mô hình thích ứng & Suy luận AI"]
         HW{"Dò phần cứng (CUDA GPU?)"}
-        M26["YOLO26m (.pt trên NVIDIA CUDA · mAP50 85.96%)"]
-        S26["YOLO26s (OpenVINO FP16 trên Intel Iris Xe iGPU · 30.8 FPS)"]
+        M26["YOLO26m (Ưu tiên OpenVINO FP16 · fallback .pt CUDA · mAP50 85.96%)"]
+        S26["YOLO26s (Ưu tiên OpenVINO FP16 · fallback .pt CPU · 30.8 FPS)"]
         BT["ByteTrack Multi-Object Tracker (+0.27 ms)"]
     end
 

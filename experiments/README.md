@@ -118,10 +118,10 @@ Từ bằng chứng định lượng của cả 3 thực nghiệm, hệ thống 
               ┌───────────────────────┴───────────────────────┐
               ▼ (Có NVIDIA CUDA GPU)                          ▼ (Không có GPU rời: Intel iGPU / CPU)
   ┌───────────────────────────────────┐          ┌──────────────────────────────────────────┐
-  │       KÍCH HOẠT YOLO26m (.pt)     │          │    KÍCH HOẠT YOLO26s (OpenVINO FP16)     │
-  │ • Thiết bị: NVIDIA CUDA           │          │ • Thiết bị: Intel Iris Xe iGPU / CPU     │
-  │ • Độ chính xác tối đa:            │          │ • Tốc độ Real-Time chuẩn công nghiệp:    │
-  │   mAP@0.5 = 85.96% | 50-95=72.47% │          │   30.8 FPS (32.51 ms) | mAP@0.5 = 80.24% │
+  │         KÍCH HOẠT YOLO26m         │          │           KÍCH HOẠT YOLO26s              │
+  │ • Ưu tiên: OpenVINO FP16          │          │ • Ưu tiên: OpenVINO FP16 (Intel iGPU)    │
+  │ • Dự phòng khi lỗi OV: .pt (CUDA) │          │ • Dự phòng khi lỗi OV: .pt (CPU)         │
+  │ • mAP@0.5 = 85.96% | 50-95=72.47% │          │ • 30.8 FPS (32.51 ms) | mAP@0.5 = 80.24% │
   └───────────────────┬───────────────┘          └─────────────────────┬────────────────────┘
                       └───────────────────────┬────────────────────────┘
                                               ▼

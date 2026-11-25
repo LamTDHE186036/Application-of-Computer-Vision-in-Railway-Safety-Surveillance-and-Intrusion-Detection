@@ -53,8 +53,8 @@ def get_optimal_device():
 def check_system_resources():
     """
     Kiểm tra tài nguyên phần cứng hệ thống để tự động lựa chọn mô hình tối ưu:
-    - Có GPU rời NVIDIA (CUDA): ưu tiên YOLO26m (độ chính xác cao nhất, dư sức Real-Time trên CUDA).
-    - Không có GPU rời (Intel Iris Xe iGPU / CPU): ưu tiên YOLO26s OpenVINO FP16 (đạt chuẩn Real-Time >= 30 FPS).
+    - Có GPU rời NVIDIA (CUDA): chọn YOLO26m (ưu tiên OpenVINO, lỗi thì fallback sang .pt).
+    - Không có GPU rời (Intel iGPU / CPU): chọn YOLO26s (ưu tiên OpenVINO, lỗi thì fallback sang .pt).
     """
     has_gpu = False
     gpu_name = None
@@ -71,12 +71,24 @@ def check_system_resources():
         "gpu_name": gpu_name
     }
 
-def _collect_model_candidates(base_dirs, model_folder, preferred_pt_names, prefer_pytorch=False):
+def _is_valid_openvino_dir(ov_dir):
+    if not os.path.isdir(ov_dir):
+        return False
+    files = os.listdir(ov_dir)
+    return any(f.endswith(".xml") for f in files) and any(f.endswith(".bin") for f in files)
+
+def _collect_model_candidates(base_dirs, model_folder, preferred_pt_names):
+    """
+    Luôn ưu tiên OpenVINO trước; chỉ dùng .pt dự phòng khi thư mục OpenVINO thiếu hoặc nạp lỗi.
+    """
     candidates = []
     for b_dir in base_dirs:
         m_dir = os.path.join(b_dir, "models", model_folder)
         pt_dir = os.path.join(m_dir, "model_pytorch")
         ov_dir = os.path.join(m_dir, "model_openvino")
+
+        if _is_valid_openvino_dir(ov_dir):
+            candidates.append(ov_dir)
 
         pt_files = [os.path.join(pt_dir, name) for name in preferred_pt_names]
         if os.path.isdir(pt_dir):
@@ -85,14 +97,7 @@ def _collect_model_candidates(base_dirs, model_folder, preferred_pt_names, prefe
                     full_p = os.path.join(pt_dir, f)
                     if full_p not in pt_files:
                         pt_files.append(full_p)
-
-        ov_valid = [ov_dir] if os.path.isdir(ov_dir) else []
-        if prefer_pytorch:
-            candidates.extend(pt_files)
-            candidates.extend(ov_valid)
-        else:
-            candidates.extend(ov_valid)
-            candidates.extend(pt_files)
+        candidates.extend([p for p in pt_files if os.path.isfile(p)])
     return candidates
 
 # --- NẠP MÔ HÌNH THÍCH ỨNG PHẦN CỨNG (ADAPTIVE HARDWARE-AWARE MODEL SELECTION) ---
@@ -103,20 +108,18 @@ def load_yolo_model():
 
     res_info = check_system_resources()
 
-    # Phương án 2: Tự động chọn mô hình tối ưu theo phần cứng
-    # - Máy có NVIDIA CUDA GPU -> ưu tiên YOLO26m (.pt trên CUDA), dự phòng YOLO26s
-    # - Máy Intel iGPU / CPU   -> ưu tiên YOLO26s (OpenVINO FP16 trên Intel iGPU), dự phòng YOLO26m
+    # Tự động chọn mô hình theo phần cứng; cả 2 mô hình đều ưu tiên OpenVINO trước, lỗi mới fallback sang .pt
     if res_info["has_gpu"]:
-        target_label = "YOLO26m (Ưu tiên CUDA - Độ chính xác cao nhất)"
+        target_label = "YOLO26m"
         model_candidates = (
-            _collect_model_candidates(base_dirs, "yolo26m", ["yolo26m.pt", "best.pt"], prefer_pytorch=True)
-            + _collect_model_candidates(base_dirs, "yolo26s", ["train-railway-yolo26s-all.pt", "yolo26s.pt"], prefer_pytorch=True)
+            _collect_model_candidates(base_dirs, "yolo26m", ["yolo26m.pt", "best.pt"])
+            + _collect_model_candidates(base_dirs, "yolo26s", ["train-railway-yolo26s-all.pt", "yolo26s.pt"])
         )
     else:
-        target_label = "YOLO26s (Ưu tiên Intel OpenVINO iGPU/CPU - Chuẩn Real-Time >= 30 FPS)"
+        target_label = "YOLO26s"
         model_candidates = (
-            _collect_model_candidates(base_dirs, "yolo26s", ["train-railway-yolo26s-all.pt", "yolo26s.pt"], prefer_pytorch=False)
-            + _collect_model_candidates(base_dirs, "yolo26m", ["yolo26m.pt", "best.pt"], prefer_pytorch=False)
+            _collect_model_candidates(base_dirs, "yolo26s", ["train-railway-yolo26s-all.pt", "yolo26s.pt"])
+            + _collect_model_candidates(base_dirs, "yolo26m", ["yolo26m.pt", "best.pt"])
         )
 
     print("=" * 78)
@@ -125,24 +128,28 @@ def load_yolo_model():
     print(f"[*] Chiến lược chọn mô hình      : {target_label}")
     print("=" * 78)
 
-    selected_model_path = None
+    last_error = None
     for p in model_candidates:
-        if os.path.exists(p):
-            selected_model_path = p
-            break
+        if not os.path.exists(p):
+            continue
+        is_ov = "openvino" in p.lower()
+        device = get_optimal_device() if is_ov else ("cuda" if res_info["has_gpu"] else "cpu")
+        try:
+            if is_ov:
+                # Kiểm tra khả năng đọc đồ thị OpenVINO IR trước khi nạp để bắt lỗi sớm và fallback sang .pt nếu lỗi
+                xml_files = [os.path.join(p, f) for f in os.listdir(p) if f.endswith(".xml")]
+                ov.Core().read_model(xml_files[0])
+            model_instance = YOLO(p)
+            active_name = "YOLO26m" if "yolo26m" in p.lower() else "YOLO26s"
+            print(f"[*] Đã nạp thành công mô hình {active_name}: {p} trên thiết bị {device}")
+            return model_instance, device, active_name
+        except Exception as e:
+            last_error = e
+            print(f"[!] Không thể nạp {p} ({e}) -> Tự động chuyển sang phương án dự phòng...")
 
-    if not selected_model_path:
-        raise FileNotFoundError("Không tìm thấy mô hình trong thư mục models/yolo26s hoặc models/yolo26m")
-
-    if "openvino" in selected_model_path.lower():
-        device = get_optimal_device()
-    else:
-        device = "cuda" if res_info["has_gpu"] else "cpu"
-
-    active_name = "YOLO26m" if "yolo26m" in selected_model_path.lower() else "YOLO26s"
-    model_instance = YOLO(selected_model_path)
-    print(f"[*] Đã nạp thành công mô hình {active_name}: {selected_model_path} trên thiết bị {device}")
-    return model_instance, device, active_name
+    raise FileNotFoundError(
+        f"Không thể nạp bất kỳ mô hình hợp lệ nào trong models/yolo26s hoặc models/yolo26m (Lỗi cuối: {last_error})"
+    )
 
 model, DEVICE, ACTIVE_MODEL_NAME = load_yolo_model()
 
