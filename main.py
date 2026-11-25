@@ -65,7 +65,7 @@ if __name__ == '__main__':
     port = find_available_port(start_port=5000)
 
     print("=" * 65)
-    print("  HỆ THỐNG GIÁM SÁT AN TOÀN ĐƯỜNG SẮT (RAILWAY SAFETY) - V1.2.1")
+    print("  HỆ THỐNG GIÁM SÁT AN TOÀN ĐƯỜNG SẮT (RAILWAY SAFETY) - V1.3.0")
     print(f"  Máy chủ đang khởi chạy tại: http://127.0.0.1:{port}")
     print("  Thư mục lưu video & nhật ký: 'data' (nằm ngay cạnh chương trình)")
     print("=" * 65)

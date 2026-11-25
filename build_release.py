@@ -9,7 +9,7 @@ if hasattr(sys.stdout, 'reconfigure'):
 if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
-APP_VERSION = "1.2.1"
+APP_VERSION = "1.3.0"
 
 def build():
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -30,22 +30,23 @@ def build():
 
     print("\n[*] PyInstaller hoàn tất! Tiến hành chuẩn bị thư mục phân phối...")
 
-    # 2. Sao chép mô hình AI yolo26s sang dist/RailwaySafety/models/
+    # 2. Sao chép đồng bộ cả 2 mô hình AI (yolo26s cho Intel iGPU/CPU và yolo26m cho NVIDIA CUDA) sang dist/RailwaySafety/models/
     src_models = os.path.join(base_dir, "models")
     dst_models = os.path.join(target_dir, "models")
     os.makedirs(dst_models, exist_ok=True)
 
-    src_m = os.path.join(src_models, "yolo26s")
-    dst_m = os.path.join(dst_models, "yolo26s")
-    if os.path.exists(src_m):
-        print(f"[*] Đang sao chép mô hình AI yolo26s sang: {dst_m}")
-        if os.path.exists(dst_m):
-            shutil.rmtree(dst_m)
-        shutil.copytree(
-            src_m,
-            dst_m,
-            ignore=shutil.ignore_patterns("*.py", "*.pyc", "__pycache__", ".git*")
-        )
+    for model_folder in ("yolo26s", "yolo26m"):
+        src_m = os.path.join(src_models, model_folder)
+        dst_m = os.path.join(dst_models, model_folder)
+        if os.path.exists(src_m):
+            print(f"[*] Đang sao chép mô hình AI {model_folder} sang: {dst_m}")
+            if os.path.exists(dst_m):
+                shutil.rmtree(dst_m)
+            shutil.copytree(
+                src_m,
+                dst_m,
+                ignore=shutil.ignore_patterns("*.py", "*.pyc", "__pycache__", ".git*", ".ultralytics_cfg")
+            )
 
     # 3. Sao chép configs/ sang dist/RailwaySafety/configs/ (luôn ghi đè để cập nhật cấu hình mới nhất)
     src_configs = os.path.join(base_dir, "configs")

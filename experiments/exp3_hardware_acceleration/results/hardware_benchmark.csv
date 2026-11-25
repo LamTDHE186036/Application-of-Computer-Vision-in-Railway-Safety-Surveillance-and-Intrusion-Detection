@@ -1,4 +1,7 @@
-Configuration,Device,Avg_Latency_ms,Median_Latency_ms,P95_Latency_ms,Min_Latency_ms,Max_Latency_ms,FPS,Speedup
-PyTorch Framework (.pt),Intel CPU,129.47,122.29,149.1,115.63,150.68,7.7,1.00x (Gốc)
-Intel OpenVINO (.xml),Intel CPU,356.56,333.81,450.34,304.31,479.42,2.8,0.36x
-Intel OpenVINO (.xml),Intel Iris Xe iGPU,30.94,31.08,32.06,28.83,32.12,32.3,4.18x
+Model,Configuration,Device,Config_Label,Frames,Avg_Latency_ms,Median_Latency_ms,P95_Latency_ms,Min_Latency_ms,Max_Latency_ms,FPS,Speedup,RealTime_25FPS
+YOLO26s,PyTorch Framework (.pt),Intel CPU,PyTorch (.pt) — Intel CPU,50,104.77,98.69,126.61,88.81,161.66,9.5,1.00x (Gốc),Không đạt
+YOLO26s,Intel OpenVINO FP16 (.xml),Intel CPU,OpenVINO FP16 — Intel CPU,50,270.9,267.7,383.94,177.0,462.13,3.7,0.39x,Không đạt
+YOLO26s,Intel OpenVINO FP16 (.xml),Intel Iris Xe iGPU,OpenVINO FP16 — Intel Iris Xe iGPU,50,32.51,32.34,34.69,28.99,38.25,30.8,3.22x,Đạt
+YOLO26m,PyTorch Framework (.pt),Intel CPU,PyTorch (.pt) — Intel CPU,50,288.49,286.0,304.97,273.75,337.21,3.5,1.00x (Gốc),Không đạt
+YOLO26m,Intel OpenVINO FP16 (.xml),Intel CPU,OpenVINO FP16 — Intel CPU,50,281.31,87.73,739.3,76.95,1044.94,3.6,1.03x,Không đạt
+YOLO26m,Intel OpenVINO FP16 (.xml),Intel Iris Xe iGPU,OpenVINO FP16 — Intel Iris Xe iGPU,50,86.85,86.57,93.21,82.86,95.93,11.5,3.32x,Không đạt

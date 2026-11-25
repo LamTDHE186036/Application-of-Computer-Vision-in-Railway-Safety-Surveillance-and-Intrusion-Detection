@@ -1,0 +1,4 @@
+Model,Path,File_Size_MB,Layers,Params_M,GFLOPs,Num_Classes
+YOLO11s,research\finetune\train_yolo11s\yolo11s.pt,18.29,319,9.43,21.68,5
+YOLO26s,models\yolo26s\model_pytorch\train-railway-yolo26s-all.pt,19.38,454,9.95,22.76,5
+YOLO26m,models\yolo26m\model_pytorch\yolo26m.pt,42.03,490,21.78,74.99,5

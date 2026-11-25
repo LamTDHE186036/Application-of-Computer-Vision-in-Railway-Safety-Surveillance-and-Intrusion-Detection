@@ -1,4 +1,7 @@
-Method,Latency_ms,P95_Latency_ms,Overhead_ms,FPS,Unique_IDs,Avg_Lifespan_Frames,ID_Fragmentations,Dwell_Support
-Pure YOLO (No Tracking),134.67,202.77,0.0,7.4,N/A,0.0,N/A,Không thể đo (Không có ID)
-BoT-SORT / DeepSORT,144.96,217.1,10.29,6.9,1,5.0,0,Khả thi (Lưu bình quân 5.0 frames/ID)
-ByteTrack (Đề xuất),139.41,204.25,4.74,7.2,1,5.0,0,Khả thi (Lưu bình quân 5.0 frames/ID)
+Model,Method,Backend,Frames,Latency_ms,P95_Latency_ms,Overhead_ms,FPS,Unique_IDs,Avg_Lifespan_Frames,ID_Fragmentations,Dwell_Support
+YOLO26s,Pure YOLO (No Tracking),openvino (intel:gpu),150,29.27,32.46,0.0,34.2,N/A,0.0,N/A,Không thể đo (Không có ID)
+YOLO26s,BoT-SORT,openvino (intel:gpu),150,33.94,35.65,4.67,29.5,2,126.0,6,Khả thi (Lưu bình quân 126.0 frames/ID)
+YOLO26s,ByteTrack (Đề xuất),openvino (intel:gpu),150,29.54,30.64,0.27,33.9,2,126.0,6,Khả thi (Lưu bình quân 126.0 frames/ID)
+YOLO26m,Pure YOLO (No Tracking),openvino (intel:gpu),150,75.63,86.35,0.0,13.2,N/A,0.0,N/A,Không thể đo (Không có ID)
+YOLO26m,BoT-SORT,openvino (intel:gpu),150,87.06,117.26,11.43,11.5,2,129.5,7,Khả thi (Lưu bình quân 129.5 frames/ID)
+YOLO26m,ByteTrack (Đề xuất),openvino (intel:gpu),150,75.17,81.3,-0.46,13.3,2,129.5,7,Khả thi (Lưu bình quân 129.5 frames/ID)

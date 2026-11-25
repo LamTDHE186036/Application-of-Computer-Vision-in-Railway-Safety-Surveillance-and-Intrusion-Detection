@@ -1,106 +1,70 @@
-# THỰC NGHIỆM 3: ĐÁNH GIÁ TỐI ƯU HÓA PHẦN CỨNG & TĂNG TỐC SUY LUẬN (HARDWARE ACCELERATION)
+# THỰC NGHIỆM 3: ĐÁNH GIÁ TỐI ƯU HÓA PHẦN CỨNG & TĂNG TỐC SUY LUẬN (YOLO26s & YOLO26m)
 
 ## 1. Đặt vấn đề & Mục tiêu Nghiên cứu
 
-Trong bài toán triển khai thực tế hệ thống Giám sát An toàn Đường sắt và Phát hiện Xâm nhập:
-- **Rào cản chi phí phần cứng biên (Edge Computing Constraints):** Việc trang bị các máy chủ gắn card đồ họa rời chuyên dụng (NVIDIA RTX / Tesla / Jetson AGX) tại từng chốt gác đường ngang, trạm chắn hay camera ven tuyến đường sắt đòi hỏi chi phí đầu tư thiết bị rất cao (\$1,500 – \$3,000 / điểm), tiêu thụ điện năng lớn và khó vận hành bền bỉ 24/7 trong tủ kỹ thuật ngoài trời không có điều hòa nhiệt độ.
-- **Yêu cầu khắt khe về thời gian thực (Real-Time Safety Standard):** Để kịp thời phát hiện chướng ngại vật trước khi đoàn tàu di chuyển tới với vận tốc cao (60 – 100 km/h), tốc độ xử lý của pipeline AI bắt buộc phải đạt tối thiểu **$\ge 25 - 30$ FPS** và độ trễ (latency) dưới **$35 - 40$ ms**.
-- **Giải pháp tiếp cận:** Tận dụng bộ công cụ tối ưu hóa chuyên sâu **Intel OpenVINO™ Toolkit (Open Visual Inference and Neural Network Optimization)** để khai thác tối đa năng lực xử lý vector của CPU và đồ họa tích hợp (**Intel Iris Xe iGPU**) sẵn có trên các máy tính văn phòng / mini-PC công nghiệp phổ thông giá rẻ.
+Trong triển khai thực tế hệ thống Giám sát An toàn Đường sắt:
+- **Rào cản chi phí phần cứng biên (Edge Computing Constraints):** Trang bị máy chủ gắn GPU rời chuyên dụng (NVIDIA RTX / Tesla) tại mọi điểm gác đường ngang tốn kém (`\$1,500 – \$3,000`/trạm), tiêu thụ điện năng cao (`120W – 250W`) và khó vận hành bền bỉ 24/7 trong tủ kỹ thuật ngoài trời.
+- **Yêu cầu thời gian thực (Real-Time Standard):** Luồng camera giám sát công nghiệp chuẩn PAL/CCTV vận hành ở mức **`25 – 30 FPS`** (tương ứng độ trễ xử lý $\le 33 – 40\text{ ms/frame}$).
+- **Giải pháp tiếp cận:** Chuyển đổi cả 2 mô hình **`YOLO26s`** (`models/yolo26s/export_openvino.py`) và **`YOLO26m`** (`models/yolo26m/export_openvino.py`) sang định dạng **Intel OpenVINO™ IR FP16** (`.xml` / `.bin`) và đo đạc trực tiếp trên máy tính văn phòng không GPU rời nhằm tìm ranh giới tối ưu cho cơ chế **Adaptive Hardware-Aware Model Selection (v1.3.0)**.
 
-Mô hình hoàn thiện cuối cùng `yolo26s` (`models/yolo26s/model_pytorch/train-railway-yolo26s-all.pt`) được chuyển đổi sang định dạng OpenVINO FP16 thông qua công cụ `models/yolo26s/export_openvino.py` và lưu tại `models/yolo26s/model_openvino`.
-
-Thực nghiệm này so sánh trực tiếp hiệu năng suy luận giữa:
-1. Mô hình gốc **PyTorch (`.pt`)** của `yolo26s` chạy trên Intel CPU.
-2. Mô hình tối ưu hóa **Intel OpenVINO (`.xml` / `.bin`)** của `yolo26s` chạy trên Intel CPU.
-3. Mô hình **Intel OpenVINO** của `yolo26s` kích hoạt nhân tăng tốc đồ họa tích hợp **Intel Iris Xe Graphics (iGPU)**.
+Thực nghiệm so sánh **6 cấu hình** (`{YOLO26s, YOLO26m} × {PyTorch CPU, OpenVINO FP16 CPU, OpenVINO FP16 Intel Iris Xe iGPU}`).
 
 ---
 
-## 2. Thông số Phần cứng & Môi trường Thực nghiệm
+## 2. Thông số Phần cứng & Quy trình Đo đạc
 
-- **Bộ vi xử lý trung tâm (CPU):** 11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz (4 Cores, 8 Threads).
-- **Bộ xử lý đồ họa tích hợp (iGPU):** Intel(R) Iris(R) Xe Graphics (96 EUs - Execution Units).
-- **Bộ nhớ RAM:** 16 GB DDR4 Dual-Channel.
-- **Hệ điều hành:** Windows 11 64-bit.
-- **Khung hình suy luận:** Chuẩn độ phân giải $640 \times 640 \times 3$.
-- **Mô hình kiểm thử:** `yolo26s` (Tập lớp đối tượng: `car`, `motorcycle`, `person`, `truck-bus`, `train`).
-- **Quy trình đo đạc:** Chạy 10 khung hình khởi động (Warmup) để loại trừ hiện tượng JIT compilation/Cold-start, sau đó lấy mẫu thống kê trên 50 khung hình suy luận liên tiếp.
+- **CPU:** 11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz (4 Cores, 8 Threads).
+- **Đồ họa tích hợp (iGPU):** Intel(R) Iris(R) Xe Graphics (96 EUs).
+- **GPU rời (NVIDIA CUDA):** Không có.
+- **RAM / HĐH:** 16 GB DDR4 Dual-Channel / Windows 11 64-bit.
+- **Dữ liệu đo đạc:** `50` khung hình thực tế nạp sẵn vào RAM từ `dataset_test/test_exp.mp4` (`25.0 FPS`), kích thước suy luận `640×640`, chạy trước `10` khung hình **Warmup** cho mỗi cấu hình để loại trừ độ trễ biên dịch JIT/OpenCL ban đầu.
 
 ---
 
-## 3. Cơ chế Kỹ thuật Tối ưu hóa của Intel OpenVINO
+## 3. Cơ chế Kỹ thuật Tối ưu hóa Intel OpenVINO FP16
 
-Quá trình chuyển đổi từ trọng số PyTorch sang OpenVINO IR mang lại các bước tối ưu hóa cấp sâu phần cứng:
-1. **Layer Fusion (Gộp tầng mạng):**
-   - Tự động gộp cặp phép toán Tích chập và Chuẩn hóa (`Conv2d + BatchNorm2d + SiLU`) thành một hạt nhân toán tử (Kernel) thực thi duy nhất trong bộ nhớ cache. Điều này triệt tiêu hoàn toàn chi phí đọc/ghi trung gian qua lại giữa RAM và thanh ghi.
-2. **Lượng tử hóa & Chuẩn số thực nửa chính xác (FP16 Precision):**
-   - Chuyển đổi trọng số từ `FP32` (32-bit float) sang `FP16` (16-bit half-precision). Dung lượng mô hình giảm một nửa, tăng gấp đôi băng thông đọc bộ nhớ và tận dụng các lệnh tính toán vector song song trên GPU EUs.
-3. **Khai thác tập lệnh phần cứng Intel:**
-   - **Trên CPU:** Tận dụng tập lệnh vector cao cấp `AVX-512` và `VNNI (Vector Neural Network Instructions)`.
-   - **Trên iGPU:** Đồ thị tính toán được biên dịch trực tiếp sang OpenCL kernel, phân phối tính toán song song trên 96 Execution Units (EUs) của chip đồ họa Intel Iris Xe, giải phóng tải tính toán cho CPU phục vụ các tác vụ giải mã video, quản lý luồng mạng và giao diện người dùng.
+1. **Layer Fusion (Gộp toán tử):** Gộp chuỗi `Conv2d + BatchNorm2d + SiLU` thành một hạt nhân toán tử duy nhất (giảm `YOLO26s` xuống `120` layers / `20.8 GFLOPs` và `YOLO26m` xuống `130` layers / `68.1 GFLOPs`).
+2. **Nén trọng số chuẩn bán chính xác FP16:** Giảm một nửa băng thông bộ nhớ và tận dụng nhân tính toán FP16 phần cứng trên 96 EUs của Intel Iris Xe iGPU.
+3. **Giải phóng tải CPU (iGPU Offloading):** Chuyển toàn bộ tính toán mạng nơ-ron sang iGPU để CPU rảnh tài nguyên cho giải mã video, chạy ByteTrack, kiểm tra ROI/Dwell Time, phục vụ Flask MJPEG và chuyển mã FFmpeg H.264.
 
 ---
 
-## 4. Kết quả Thực nghiệm Đo đạc Thực tế
+## 4. Kết quả Đo đạc Thực tế
+*(Trích xuất trực tiếp từ `results/hardware_benchmark.csv`, chạy lệnh `python experiments/exp3_hardware_acceleration/benchmark_hardware.py --frames 50`)*
 
-Số liệu được đo đạc chính xác qua quá trình benchmark độc lập trên cùng phần cứng máy trạm (trích xuất từ `results/hardware_benchmark.csv`):
-
-### Bảng 1: Kết quả Benchmark Hiệu năng Suy luận (Inference Benchmark)
-
-| STT | Cấu hình Mô hình | Thiết bị Phần cứng | Độ trễ TB (ms) | Trung vị (ms) | P95 Latency (ms) | Min (ms) | Max (ms) | Tốc độ (FPS) | Hệ số Tăng tốc | Đạt chuẩn Real-Time ($\ge 30$ FPS) |
-| :---: | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| 1 | **PyTorch Framework (`.pt`)** | Intel CPU | 100.13 ms | 89.19 ms | 130.51 ms | 84.31 ms | 265.66 ms | 10.0 FPS | **1.00x (Gốc)** | ❌ Không đạt |
-| 2 | **Intel OpenVINO (`.xml`)** | Intel CPU | 249.29 ms | 239.31 ms | 330.78 ms | 153.17 ms | 516.89 ms | 4.0 FPS | 0.40x | ❌ Chậm hơn (Không có iGPU offload) |
-| 3 | **Intel OpenVINO (`.xml`)** | **Intel Iris Xe iGPU** | **28.16 ms** | **28.06 ms** | **29.19 ms** | **27.28 ms** | **29.51 ms** | **35.5 FPS** | **3.56x** | ✅ **Vượt chuẩn (Tối ưu nhất)** |
-
-```
-So sánh Tốc độ Khung hình (FPS) giữa các Cấu hình:
-========================================================================
-PyTorch CPU      : [########                     ] 10.0 FPS
-OpenVINO Iris Xe : [############################ ] 35.5 FPS (TĂNG TỐC 3.56 LẦN)
-========================================================================
-Chuẩn Real-time  : [#######################      ] 30.0 FPS
-========================================================================
-```
+| Mô hình | Cấu hình thực thi | Thiết bị | Độ trễ TB (ms) | Trung vị (ms) | P95 Latency (ms) | Min / Max (ms) | Tốc độ (FPS) | Tăng tốc | Chuẩn Real-Time ($\ge 25$ FPS) |
+| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **`YOLO26s`** | PyTorch (`.pt`) | Intel CPU | 104.77 ms | 98.69 ms | 126.61 ms | 88.81 / 161.66 ms | 9.5 FPS | 1.00x (Gốc) | ❌ Không đạt |
+| **`YOLO26s`** | OpenVINO FP16 (`.xml`) | Intel CPU | 270.90 ms | 267.70 ms | 383.94 ms | 177.00 / 462.13 ms | 3.7 FPS | 0.39x | ❌ Không đạt |
+| **`YOLO26s`** | **OpenVINO FP16 (`.xml`)** | **Intel Iris Xe iGPU** | **32.51 ms** | **32.34 ms** | **34.69 ms** | **28.99 / 38.25 ms** | **30.8 FPS** | **3.22x** | ✅ **Đạt chuẩn Real-Time** |
+| **`YOLO26m`** | PyTorch (`.pt`) | Intel CPU | 288.49 ms | 286.00 ms | 304.97 ms | 273.75 / 337.21 ms | 3.5 FPS | 1.00x (Gốc) | ❌ Không đạt |
+| **`YOLO26m`** | OpenVINO FP16 (`.xml`) | Intel CPU | 281.31 ms | 87.73 ms | 739.30 ms | 76.95 / 1044.94 ms | 3.6 FPS | 1.03x | ❌ Không đạt |
+| **`YOLO26m`** | **OpenVINO FP16 (`.xml`)** | **Intel Iris Xe iGPU** | **86.85 ms** | **86.57 ms** | **93.21 ms** | **82.86 / 95.93 ms** | **11.5 FPS** | **3.32x** | ❌ **Chưa đạt trên iGPU** |
 
 ---
 
-## 5. Phân tích Khoa học & Đánh giá Chuyên sâu
+## 5. Phân tích Khoa học & Ý nghĩa Kiến trúc
 
-1. **Hiệu quả vượt bậc của Intel OpenVINO trên Intel Iris Xe iGPU:**
-   - **PyTorch CPU thuần (Baseline):** Mô hình `yolo26s.pt` có độ trễ trung bình **100.13 ms** (chỉ đạt **10.0 FPS**). Ở tốc độ này, khung hình video bị trễ, dễ gây bỏ lỡ khoảnh khắc chướng ngại vật băng qua đường ngang.
-   - **OpenVINO trên Intel Iris Xe iGPU:** Đạt độ trễ trung bình xuất sắc **28.16 ms** (trung vị **28.06 ms**, P95 **29.19 ms**), tốc độ khung hình đạt **35.5 FPS** (tăng tốc **3.56 lần** so với PyTorch CPU).
-2. **Lợi ích kiến trúc của việc chạy trên iGPU:**
-   - Khi giao tác vụ suy luận mô hình học sâu nặng nề cho 96 EUs của card đồ họa tích hợp Intel Iris Xe, **tải CPU được giảm tải tối đa**. 
-   - Nhờ đó, CPU có đầy đủ tài nguyên để đồng thời thực thi:
-     - Giải mã luồng video độ phân giải cao (H.264/H.265 RTSP Stream).
-     - Thuật toán theo dõi liên tục đa đối tượng (**ByteTrack**).
-     - Tính toán hình học đa giác vùng xâm nhập (ROI Polygon Intersection) và thời gian dừng đỗ (Dwell Time).
-     - Vận hành Web Server Flask và đẩy luồng video trực tiếp tới trình duyệt người dùng qua HTTP Multipart.
-3. **Ý nghĩa thực tiễn & Giá trị Kinh tế:**
-   - **Tiết kiệm chi phí đầu tư thiết bị:** Các đơn vị quản lý đường sắt không cần phải trang bị máy tính công nghiệp đắt tiền với card đồ họa rời NVIDIA (\$2,000+). Hệ thống hoàn toàn có thể chạy ổn định xấp xỉ 36 FPS trên các máy tính văn phòng hoặc Mini PC Intel NUC / Core i5 phổ thông (\$400 – \$600).
-   - **Tối ưu hóa nhiệt độ và tiết kiệm điện:** Intel Iris Xe iGPU tiêu thụ công suất TDP cực thấp (chỉ từ 15W – 28W so với 120W – 250W của card rời), giúp máy trạm chạy bền bỉ 24/7 trong môi trường thời tiết khắc nghiệt mà không lo quá nhiệt.
+1. **Intel Iris Xe iGPU tăng tốc đồng đều `3.22x – 3.32x` cho cả 2 mô hình:**
+   - **`YOLO26s`:** Rút độ trễ từ `104.77 ms` (`9.5 FPS`) xuống **`32.51 ms`** (**`30.8 FPS`**, P95 chỉ `34.69 ms` — cực kỳ ổn định), vượt chuẩn Real-Time cả `25 FPS` lẫn `30 FPS`.
+   - **`YOLO26m`:** Rút độ trễ từ `288.49 ms` (`3.5 FPS`) xuống **`86.85 ms`** (**`11.5 FPS`**, tăng tốc `3.32x`), tuy nhiên do khối lượng tính toán `68.1 GFLOPs` gấp `3.27x` so với `YOLO26s` (`20.8 GFLOPs`), tốc độ `11.5 FPS` trên iGPU văn phòng chưa đủ mượt để chạy Real-Time 25–30 FPS.
+2. **Vì sao OpenVINO FP16 chạy trên Intel CPU chậm hơn PyTorch CPU (`3.7 FPS` vs `9.5 FPS` ở `YOLO26s`)?**
+   - Mô hình OpenVINO được nén chuẩn **`FP16`** để tối ưu cho nhân phần cứng FP16 trên Intel Iris Xe iGPU. Trên CPU thế hệ 11 (Tiger Lake) không có tập lệnh FP16 gốc (`AVX-512 FP16` chỉ xuất hiện từ Sapphire Rapids), OpenVINO phải chuyển đổi kiểu dữ liệu ngược lên FP32 khi tính toán trên CPU, gây phát sinh chi phí chuyển đổi. Do đó khi chạy OpenVINO FP16, bắt buộc nên kích hoạt đích phần cứng `intel:gpu`.
+3. **Cơ sở vững chắc cho chiến lược Chọn Mô hình Thích ứng Phần cứng (`v1.3.0`):**
+   - **Máy văn phòng / Mini-PC không GPU rời (`\$400 – \$600`, TDP `15–28W`):** Hệ thống tự động chọn **`YOLO26s` OpenVINO FP16 trên Intel Iris Xe iGPU (`30.8 FPS`)**, đảm bảo vận hành liên tục 24/7 mượt mà không rớt frame.
+   - **Máy trạm có GPU rời NVIDIA CUDA:** Hệ thống tự động chọn **`YOLO26m` PyTorch CUDA** để tận hưởng độ chính xác cao nhất (`85.96%` mAP@0.5, `72.47%` mAP@0.5:0.95) mà vẫn dư thừa tốc độ Real-Time.
 
 ---
 
-## 6. Hướng dẫn Chạy Đo đạc & Xuất Mô hình
+## 6. Hướng dẫn Xuất Mô hình & Tái hiện Thực nghiệm
 
-### 1. Xuất mô hình PyTorch sang OpenVINO FP16:
 ```bash
+# 1. Xuất mô hình sang Intel OpenVINO FP16
 python models/yolo26s/export_openvino.py
-```
+python models/yolo26m/export_openvino.py
 
-### 2. Thực thi Benchmark hiệu năng trên phần cứng của bạn:
-```bash
-# Đo đạc tự động trên CPU và iGPU
+# 2. Chạy lại benchmark phần cứng cho cả 2 mô hình (10 warmup + 50 frames)
 python experiments/exp3_hardware_acceleration/benchmark_hardware.py --frames 50
 ```
 
----
-
-## 7. Kết luận Thực nghiệm 3
-
-Thực nghiệm đã chứng minh rõ nét hiệu quả của việc ứng dụng **Intel OpenVINO Toolkit kết hợp chip đồ họa tích hợp Intel Iris Xe**:
-- Đạt tốc độ suy luận **35.5 FPS** với độ trễ chỉ **28.16 ms**, tăng tốc **3.56 lần** so với PyTorch CPU truyền thống (10.0 FPS).
-- Độ trễ ổn định cao với P95 đạt **29.19 ms** và trung vị **28.06 ms**.
-- Biến một máy trạm phổ thông thành thiết bị giám sát an toàn đường sắt thời gian thực chuẩn công nghiệp, tối ưu hóa toàn diện cả về **hiệu năng kỹ thuật** lẫn **hiệu quả kinh tế**.
+Toàn bộ dữ liệu thô và biểu đồ được lưu tại `results/hardware_benchmark.csv` và `results/chart_hardware_benchmark.png`.

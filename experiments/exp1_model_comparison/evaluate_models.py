@@ -1,38 +1,59 @@
 """
-Thực nghiệm 1: Đánh giá & So sánh Kiến trúc Mô hình Nhận diện (YOLO11s vs YOLO26s)
-So sánh 2 mô hình huấn luyện đầy đủ trên dữ liệu an toàn đường sắt (5 lớp:
-0: car, 1: motorcycle, 2: person, 3: truck-bus, 4: train):
-1. YOLO11s (Baseline - research/finetune/train_yolo11s/yolo11s.pt)
-2. YOLO26s (Đề xuất  - models/yolo26s/model_pytorch/train-railway-yolo26s-all.pt)
+Thực nghiệm 1: Đánh giá & So sánh Đối đầu 3 Kiến trúc Mô hình Nhận diện (YOLO11s vs YOLO26s vs YOLO26m)
+So sánh 3 mô hình huấn luyện trên dữ liệu an toàn đường sắt đầy đủ 5 lớp
+(0: car, 1: motorcycle, 2: person, 3: truck-bus, 4: train):
+1. YOLO11s (Baseline)          - research/finetune/train_yolo11s/yolo11s.pt
+2. YOLO26s (Edge Real-Time)    - models/yolo26s/model_pytorch/train-railway-yolo26s-all.pt
+3. YOLO26m (High-Accuracy GPU) - models/yolo26m/model_pytorch/yolo26m.pt
 
-Đánh giá chéo trên 3 tập dữ liệu kiểm thử độc lập tại dataset_test:
-- dataset_test/roboflow_crossing/data.yaml (5 lớp: car, motorcycle, person, train, truck-bus)
-- dataset_test/rcd_ground/data.yaml        (3 lớp: car, person, truck-bus)
-- dataset_test/rcd_elevated/data.yaml      (4 lớp: car, person, train, truck-bus)
+Đánh giá chéo độc lập trên 3 tập dữ liệu kiểm thử trong dataset_test/ (404 ảnh / 1.238 đối tượng):
+- dataset_test/roboflow_crossing/data.yaml (119 ảnh, 5 lớp)
+- dataset_test/rcd_ground/data.yaml        (185 ảnh, 3 lớp)
+- dataset_test/rcd_elevated/data.yaml      (100 ảnh, 4 lớp)
 
 Cơ chế tự động đồng bộ khi đánh giá (MappedDetectionValidator):
-- Tự động xử lý đường dẫn Roboflow (`../valid/images` -> `images`) bằng file YAML tạm mà không sửa `dataset_test`.
-- Ánh xạ chính xác ID lớp 1-1 theo tên lớp giữa mô hình và từng tập dữ liệu
-  (xử lý thứ tự ID đảo vị trí giữa `train`/`truck-bus` và lọc bỏ các lớp không có trong tập con).
+- Tự động xử lý đường dẫn Roboflow (`../valid/images` -> `images`) qua YAML tạm, giữ nguyên `dataset_test/`.
+- Ánh xạ chính xác ID lớp 1-1 theo tên lớp giữa mô hình và từng tập dữ liệu kiểm thử.
+- Xuất đầy đủ bảng CSV (specs, summary, average, per_class, per_class_avg) và biểu đồ so sánh trực quan.
 """
 
 import os
+import sys
 import time
 import tempfile
 import argparse
 import yaml
 import numpy as np
 import pandas as pd
+
+# Đảm bảo xuất tiếng Việt ổn định trên Windows console
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+# Thiết lập đường dẫn cơ sở
+EXP1_DIR = os.path.abspath(os.path.dirname(__file__))
+BASE_DIR = os.path.abspath(os.path.join(EXP1_DIR, "..", ".."))
+RESULTS_DIR = os.path.join(EXP1_DIR, "results")
+FINETUNE_DIR = os.path.join(BASE_DIR, "research", "finetune")
+
+# Đảm bảo Ultralytics luôn có thư mục cấu hình ghi được
+if not os.environ.get("YOLO_CONFIG_DIR"):
+    _tmp_cfg = os.path.join(tempfile.gettempdir(), "railsafe_ultralytics_cfg")
+    try:
+        os.makedirs(_tmp_cfg, exist_ok=True)
+        os.environ["YOLO_CONFIG_DIR"] = _tmp_cfg
+    except Exception:
+        _local_cfg = os.path.join(EXP1_DIR, ".ultralytics_cfg")
+        os.makedirs(_local_cfg, exist_ok=True)
+        os.environ["YOLO_CONFIG_DIR"] = _local_cfg
+
 import torch
 from ultralytics import YOLO
 from ultralytics.models.yolo.detect import DetectionValidator
 from ultralytics.utils.metrics import ConfusionMatrix
-
-# Thiết lập đường dẫn cơ sở
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-EXP1_DIR = os.path.abspath(os.path.dirname(__file__))
-RESULTS_DIR = os.path.join(EXP1_DIR, "results")
-FINETUNE_DIR = os.path.join(BASE_DIR, "research", "finetune")
+from ultralytics.utils.torch_utils import get_flops, get_num_params
 
 
 def resolve_dataset_dir():
@@ -53,7 +74,7 @@ def first_existing_path(candidates):
 
 
 def resolve_models():
-    """Tự động dò tìm đường dẫn trọng số hợp lệ cho 2 mô hình YOLO11s và YOLO26s"""
+    """Tự động dò tìm đường dẫn trọng số hợp lệ cho 3 mô hình YOLO11s, YOLO26s và YOLO26m"""
     return {
         "YOLO11s": first_existing_path([
             os.path.join(FINETUNE_DIR, "train_yolo11s", "yolo11s.pt"),
@@ -65,11 +86,16 @@ def resolve_models():
             os.path.join(FINETUNE_DIR, "train_yolo26s", "yolo26s.pt"),
             os.path.join(FINETUNE_DIR, "train_yolo26s", "train-railway-yolo26s", "weights", "best.pt"),
         ]),
+        "YOLO26m": first_existing_path([
+            os.path.join(BASE_DIR, "models", "yolo26m", "model_pytorch", "yolo26m.pt"),
+            os.path.join(FINETUNE_DIR, "train_yolo26m", "yolo26m.pt"),
+            os.path.join(FINETUNE_DIR, "train_yolo26m", "model", "yolo26m.pt"),
+            os.path.join(BASE_DIR, "Fine-tune-Dataset-Lam", "Fine-tune-Dataset-Lam", "model", "best.pt"),
+        ]),
     }
 
 
 def normalize_names(names_obj):
-    """Chuẩn hóa trường names (dict hoặc list) sang dạng dict {int: str}"""
     if isinstance(names_obj, dict):
         return {int(k): str(v) for k, v in names_obj.items()}
     if isinstance(names_obj, (list, tuple)):
@@ -78,11 +104,9 @@ def normalize_names(names_obj):
 
 
 def build_class_mapping(model_names, ds_names):
-    """Ánh xạ 1-1 theo tên lớp giữa mô hình và tập kiểm thử (trả về -1 nếu tập con không có lớp đó)"""
     m_names = normalize_names(model_names)
     d_names = normalize_names(ds_names)
     ds_name_to_id = {name.lower().strip(): cid for cid, name in d_names.items()}
-
     return {
         m_id: ds_name_to_id.get(m_name.lower().strip(), -1)
         for m_id, m_name in m_names.items()
@@ -90,11 +114,6 @@ def build_class_mapping(model_names, ds_names):
 
 
 def prepare_dataset_yaml(ds_yaml, temp_dir):
-    """
-    Kiểm tra đường dẫn val trong data.yaml. Nếu data.yaml dùng đường dẫn tương đối kiểu Roboflow
-    (ví dụ `../valid/images`) không tồn tại trên đĩa nhưng thư mục `images/` tồn tại cạnh data.yaml,
-    tạo file YAML tạm trỏ đúng vào thư mục ảnh mà không chỉnh sửa file gốc trong dataset_test.
-    """
     ds_dir = os.path.abspath(os.path.dirname(ds_yaml))
     with open(ds_yaml, "r", encoding="utf-8") as fp:
         cfg = yaml.safe_load(fp) or {}
@@ -132,10 +151,7 @@ DATASETS = {
 
 
 class MappedDetectionValidator(DetectionValidator):
-    """
-    Custom Ultralytics DetectionValidator tự động ánh xạ 1-1 ID lớp giữa mô hình và từng tập
-    dữ liệu kiểm thử trong dataset_test trước khi tính mAP, Confusion Matrix và vẽ đồ thị PR/F1.
-    """
+    """Custom Ultralytics DetectionValidator ánh xạ 1-1 ID lớp theo tên lớp giữa mô hình và tập kiểm thử."""
 
     def init_metrics(self, model):
         super().init_metrics(model)
@@ -150,7 +166,6 @@ class MappedDetectionValidator(DetectionValidator):
             lut[m_id] = ds_id
         self._class_lut = lut
 
-        # Cập nhật metadata validator & metrics theo đúng hệ lớp của tập dữ liệu đang đánh giá
         self.names = ds_names
         self.nc = len(ds_names)
         self.class_map = list(range(1, self.nc + 1))
@@ -189,8 +204,32 @@ class MappedDetectionValidator(DetectionValidator):
         return remapped_outputs
 
 
+def inspect_model_specs(model_name, model_path, model_obj):
+    file_size_mb = os.path.getsize(model_path) / (1024 * 1024)
+    n_layers = len(list(model_obj.model.modules()))
+    n_params = get_num_params(model_obj.model)
+    try:
+        gflops = float(get_flops(model_obj.model, imgsz=640))
+    except Exception:
+        gflops = 0.0
+    try:
+        info = model_obj.model.info(detailed=False, verbose=False)
+        if isinstance(info, (tuple, list)) and len(info) >= 4:
+            n_layers, n_params, _, gflops = info[:4]
+    except Exception:
+        pass
+    return {
+        "Model": model_name,
+        "Path": os.path.relpath(model_path, BASE_DIR),
+        "File_Size_MB": round(file_size_mb, 2),
+        "Layers": int(n_layers),
+        "Params_M": round(float(n_params) / 1e6, 2),
+        "GFLOPs": round(float(gflops), 2),
+        "Num_Classes": len(model_obj.names),
+    }
+
+
 def format_class_mapping(model_names, ds_names):
-    """Tạo chuỗi mô tả quy tắc ánh xạ lớp giữa mô hình và từng tập dữ liệu"""
     m_names = normalize_names(model_names)
     d_names = normalize_names(ds_names)
     mapping = build_class_mapping(m_names, d_names)
@@ -205,10 +244,6 @@ def format_class_mapping(model_names, ds_names):
 
 
 def extract_all_per_class_metrics(val_results):
-    """
-    Trích xuất chính xác Precision, Recall, mAP50, mAP50-95 và số lượng nhãn (Targets)
-    cho từng lớp trong tập dữ liệu kiểm thử.
-    """
     dataset_classes = normalize_names(val_results.names)
     ap_class_indices = [int(c) for c in getattr(val_results.box, "ap_class_index", [])]
     index_to_pos = {c_idx: pos for pos, c_idx in enumerate(ap_class_indices)}
@@ -220,12 +255,14 @@ def extract_all_per_class_metrics(val_results):
         if c_idx in index_to_pos and targets > 0:
             pos = index_to_pos[c_idx]
             p_c, r_c, ap50_c, ap50_95_c = val_results.box.class_result(pos)
+            f1_c = (2 * p_c * r_c / (p_c + r_c)) if (p_c + r_c) > 0 else 0.0
             per_class.append({
                 "Class_ID": int(c_idx),
                 "Class": str(c_name),
                 "Targets": targets,
                 "Precision": round(float(p_c), 4),
                 "Recall": round(float(r_c), 4),
+                "F1": round(float(f1_c), 4),
                 "mAP50": round(float(ap50_c), 4),
                 "mAP50-95": round(float(ap50_95_c), 4),
             })
@@ -236,30 +273,143 @@ def extract_all_per_class_metrics(val_results):
                 "Targets": 0,
                 "Precision": np.nan,
                 "Recall": np.nan,
+                "F1": np.nan,
                 "mAP50": np.nan,
                 "mAP50-95": np.nan,
             })
-
     return per_class
 
 
+def generate_comparison_charts(df_avg, df_summary, df_class_avg, df_specs):
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except Exception as e:
+        print(f"[!] Bỏ qua vẽ biểu đồ (không có matplotlib): {e}")
+        return
+
+    colors = {"YOLO11s": "#64748b", "YOLO26s": "#0d828a", "YOLO26m": "#e11d48"}
+    models = df_avg["Model"].tolist()
+    n_m = len(models)
+    width = 0.8 / max(1, n_m)
+
+    # 1. Macro Average Metrics & Per-Dataset mAP@0.5
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5.2))
+    metrics = ["Precision", "Recall", "F1", "mAP50", "mAP50-95"]
+    x = np.arange(len(metrics))
+    for i, m in enumerate(models):
+        row = df_avg[df_avg["Model"] == m].iloc[0]
+        vals = [row[k] * 100 for k in metrics]
+        offset = (i - (n_m - 1) / 2) * width
+        bars = axes[0].bar(x + offset, vals, width, label=m, color=colors.get(m))
+        for b in bars:
+            h = b.get_height()
+            axes[0].text(b.get_x() + b.get_width() / 2, h + 0.8, f"{h:.1f}", ha="center", va="bottom", fontsize=7.5)
+    axes[0].set_title("Macro Average Metrics trên 3 tập dataset_test (404 ảnh)")
+    axes[0].set_xticks(x)
+    axes[0].set_xticklabels(["Precision", "Recall", "F1-Score", "mAP@0.5", "mAP@50-95"])
+    axes[0].set_ylim(0, 105)
+    axes[0].set_ylabel("Phần trăm (%)")
+    axes[0].grid(axis="y", linestyle="--", alpha=0.4)
+    axes[0].legend()
+
+    ds_list = list(DATASETS.keys())
+    x2 = np.arange(len(ds_list))
+    for i, m in enumerate(models):
+        vals = []
+        for ds in ds_list:
+            sub = df_summary[(df_summary["Model"] == m) & (df_summary["Dataset"] == ds)]
+            vals.append(sub.iloc[0]["mAP50"] * 100 if not sub.empty else 0.0)
+        offset = (i - (n_m - 1) / 2) * width
+        bars = axes[1].bar(x2 + offset, vals, width, label=m, color=colors.get(m))
+        for b in bars:
+            h = b.get_height()
+            axes[1].text(b.get_x() + b.get_width() / 2, h + 0.8, f"{h:.1f}%", ha="center", va="bottom", fontsize=7.5)
+    axes[1].set_title("mAP@0.5 theo từng tập kiểm thử độc lập")
+    axes[1].set_xticks(x2)
+    axes[1].set_xticklabels(ds_list)
+    axes[1].set_ylim(0, 105)
+    axes[1].set_ylabel("mAP@0.5 (%)")
+    axes[1].grid(axis="y", linestyle="--", alpha=0.4)
+    axes[1].legend()
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(RESULTS_DIR, "chart_3models_accuracy.png"), dpi=160)
+    plt.close(fig)
+
+    # 2. Per-Class mAP@0.5 (5 classes)
+    if not df_class_avg.empty:
+        fig, ax = plt.subplots(figsize=(10, 5))
+        classes = sorted(df_class_avg["Class"].unique().tolist())
+        xc = np.arange(len(classes))
+        for i, m in enumerate(models):
+            vals = []
+            for cls in classes:
+                sub = df_class_avg[(df_class_avg["Model"] == m) & (df_class_avg["Class"] == cls)]
+                vals.append(sub.iloc[0]["mAP50"] * 100 if not sub.empty else 0.0)
+            offset = (i - (n_m - 1) / 2) * width
+            bars = ax.bar(xc + offset, vals, width, label=m, color=colors.get(m))
+            for b in bars:
+                h = b.get_height()
+                ax.text(b.get_x() + b.get_width() / 2, h + 0.8, f"{h:.1f}", ha="center", va="bottom", fontsize=7.5)
+        ax.set_title("So sánh mAP@0.5 trung bình theo từng lớp (5 lớp)")
+        ax.set_xticks(xc)
+        ax.set_xticklabels(classes)
+        ax.set_ylim(0, 108)
+        ax.set_ylabel("mAP@0.5 (%)")
+        ax.grid(axis="y", linestyle="--", alpha=0.4)
+        ax.legend()
+        plt.tight_layout()
+        plt.savefig(os.path.join(RESULTS_DIR, "chart_3models_per_class.png"), dpi=160)
+        plt.close(fig)
+
+    # 3. Pareto Trade-off: Latency & Complexity vs mAP
+    if not df_specs.empty:
+        merged = pd.merge(df_specs, df_avg[["Model", "mAP50", "mAP50-95", "Inference_ms"]], on="Model")
+        fig, axes = plt.subplots(1, 2, figsize=(12, 4.6))
+        bar_colors = [colors.get(m, "#475569") for m in merged["Model"]]
+
+        b1 = axes[0].bar(merged["Model"], merged["Inference_ms"], color=bar_colors, width=0.5)
+        for b in b1:
+            h = b.get_height()
+            axes[0].text(b.get_x() + b.get_width() / 2, h + 3, f"{h:.1f} ms", ha="center", va="bottom", fontsize=8.5)
+        axes[0].set_title("Độ trễ suy luận TB trên CPU (ms/ảnh — thấp hơn tốt hơn)")
+        axes[0].set_ylabel("Inference Latency (ms)")
+        axes[0].grid(axis="y", linestyle="--", alpha=0.4)
+
+        b2 = axes[1].bar(merged["Model"], merged["GFLOPs"], color=bar_colors, width=0.5)
+        for b, (_, r) in zip(b2, merged.iterrows()):
+            h = b.get_height()
+            axes[1].text(
+                b.get_x() + b.get_width() / 2, h + 1.2,
+                f"{h:.1f}G\n({r['File_Size_MB']:.1f} MB | {r['Params_M']:.2f}M)",
+                ha="center", va="bottom", fontsize=8
+            )
+        axes[1].set_title("Độ phức tạp tính toán (GFLOPs), Tham số & Dung lượng")
+        axes[1].set_ylabel("GFLOPs")
+        axes[1].set_ylim(0, max(merged["GFLOPs"]) * 1.28)
+        axes[1].grid(axis="y", linestyle="--", alpha=0.4)
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(RESULTS_DIR, "chart_3models_complexity.png"), dpi=160)
+        plt.close(fig)
+
+
 def run_evaluation(batch_size=1, imgsz=640, device="cpu"):
-    """
-    Thực thi validation trực tiếp trên dataset_test cho 2 mô hình YOLO11s và YOLO26s.
-    Mặc định batch_size=1 để đo chính xác độ trễ suy luận (Inference_ms) thời gian thực.
-    """
+    """Thực thi validation trên dataset_test cho cả 3 mô hình YOLO11s, YOLO26s và YOLO26m."""
     os.makedirs(RESULTS_DIR, exist_ok=True)
+    spec_rows = []
     summary_rows = []
     class_rows = []
     model_order = list(MODELS.keys())
 
-    print("=" * 95)
-    print(" THỰC NGHIỆM 1: ĐÁNH GIÁ ĐỐI ĐẦU YOLO11s VS YOLO26s TRÊN DATASET_TEST (5 LỚP)")
+    print("=" * 98)
+    print(" THỰC NGHIỆM 1: ĐÁNH GIÁ ĐỐI ĐẦU 3 MÔ HÌNH YOLO11s VS YOLO26s VS YOLO26m TRÊN DATASET_TEST")
     print(f"[*] Thư mục dữ liệu   : {DATASET_DIR}")
     print(f"[*] Thiết bị suy luận : {device}")
-    print(f"[*] Kích thước ảnh    : {imgsz}x{imgsz}")
-    print(f"[*] Kích thước batch  : {batch_size}")
-    print("=" * 95)
+    print(f"[*] Kích thước ảnh    : {imgsz}x{imgsz} | batch={batch_size}")
+    print("=" * 98)
 
     with tempfile.TemporaryDirectory(prefix="railsafe_val_yaml_") as tmp_dir:
         resolved_datasets = {}
@@ -276,7 +426,12 @@ def run_evaluation(batch_size=1, imgsz=640, device="cpu"):
 
             print(f"\n>>> Đang nạp mô hình {model_name}: {model_path}")
             model = YOLO(model_path)
-            print(f"    Hệ lớp gốc của mô hình ({len(model.names)} lớp): {dict(model.names)}")
+            specs = inspect_model_specs(model_name, model_path, model)
+            spec_rows.append(specs)
+            print(
+                f"    Thông số: {specs['File_Size_MB']} MB | {specs['Layers']} layers | "
+                f"{specs['Params_M']}M params | {specs['GFLOPs']} GFLOPs | classes={dict(model.names)}"
+            )
 
             for ds_name, eval_yaml in resolved_datasets.items():
                 print(f"[*] Đang đánh giá {model_name} trên tập '{ds_name}'...")
@@ -289,7 +444,7 @@ def run_evaluation(batch_size=1, imgsz=640, device="cpu"):
                     imgsz=imgsz,
                     device=device,
                     plots=True,
-                    save=True,
+                    save=False,
                     project=RESULTS_DIR,
                     name=f"{model_name}_{ds_name}",
                     exist_ok=True,
@@ -300,17 +455,20 @@ def run_evaluation(batch_size=1, imgsz=640, device="cpu"):
                 print(f"    Ánh xạ lớp ({ds_name}):")
                 print(format_class_mapping(model.names, val_results.names))
 
-                # Lấy các chỉ số tổng hợp
                 p = float(val_results.box.mp)
                 r = float(val_results.box.mr)
+                f1 = (2 * p * r / (p + r)) if (p + r) > 0 else 0.0
                 map50 = float(val_results.box.map50)
                 map50_95 = float(val_results.box.map)
                 speed_inference = float(val_results.speed.get("inference", 0.0))
                 speed_preprocess = float(val_results.speed.get("preprocess", 0.0))
                 speed_postprocess = float(val_results.speed.get("postprocess", 0.0))
                 total_latency = speed_preprocess + speed_inference + speed_postprocess
-
-                num_targets = int(val_results.nt_per_class.sum()) if getattr(val_results, "nt_per_class", None) is not None else 0
+                num_targets = (
+                    int(val_results.nt_per_class.sum())
+                    if getattr(val_results, "nt_per_class", None) is not None
+                    else 0
+                )
 
                 summary_rows.append({
                     "Model": model_name,
@@ -318,6 +476,7 @@ def run_evaluation(batch_size=1, imgsz=640, device="cpu"):
                     "Targets": num_targets,
                     "Precision": round(p, 4),
                     "Recall": round(r, 4),
+                    "F1": round(f1, 4),
                     "mAP50": round(map50, 4),
                     "mAP50-95": round(map50_95, 4),
                     "Inference_ms": round(speed_inference, 2),
@@ -325,7 +484,6 @@ def run_evaluation(batch_size=1, imgsz=640, device="cpu"):
                     "Validation_Time_s": round(val_time, 2),
                 })
 
-                # Lấy chỉ số chi tiết theo từng lớp
                 for c_metrics in extract_all_per_class_metrics(val_results):
                     class_rows.append({
                         "Model": model_name,
@@ -334,53 +492,32 @@ def run_evaluation(batch_size=1, imgsz=640, device="cpu"):
                         "Targets": c_metrics["Targets"],
                         "Precision": c_metrics["Precision"],
                         "Recall": c_metrics["Recall"],
+                        "F1": c_metrics["F1"],
                         "mAP50": c_metrics["mAP50"],
                         "mAP50-95": c_metrics["mAP50-95"],
                     })
 
                 print(
                     f"    [+] Xong {model_name} - {ds_name} ({num_targets} targets): "
-                    f"P={p*100:.2f}%, R={r*100:.2f}%, mAP50={map50*100:.2f}%, "
-                    f"mAP50-95={map50_95*100:.2f}%, Inference={speed_inference:.2f}ms"
+                    f"P={p*100:.2f}%, R={r*100:.2f}%, F1={f1*100:.2f}%, "
+                    f"mAP50={map50*100:.2f}%, mAP50-95={map50_95*100:.2f}%, Inf={speed_inference:.2f}ms"
                 )
 
     if not summary_rows:
         print("[!] Không có dữ liệu kết quả nào được ghi nhận. Vui lòng kiểm tra lại đường dẫn!")
         return None, None
 
+    df_specs = pd.DataFrame(spec_rows)
     df_summary = pd.DataFrame(summary_rows)
     df_class = pd.DataFrame(class_rows)
 
-    summary_csv = os.path.join(RESULTS_DIR, "comparison_summary.csv")
-    class_csv = os.path.join(RESULTS_DIR, "comparison_per_class.csv")
-    df_summary.to_csv(summary_csv, index=False)
-    df_class.to_csv(class_csv, index=False)
-
-    # Tính toán bảng chỉ số trung bình trên 3 tập dữ liệu (Macro Average), giữ đúng thứ tự mô hình
-    metric_cols = ["Precision", "Recall", "mAP50", "mAP50-95", "Inference_ms", "Total_Latency_ms", "Validation_Time_s"]
+    metric_cols = ["Precision", "Recall", "F1", "mAP50", "mAP50-95", "Inference_ms", "Total_Latency_ms", "Validation_Time_s"]
     df_avg = df_summary.groupby("Model", as_index=False)[metric_cols].mean().round(4)
     df_avg["_order"] = df_avg["Model"].apply(lambda x: model_order.index(x) if x in model_order else 999)
     df_avg = df_avg.sort_values("_order").drop(columns=["_order"]).reset_index(drop=True)
 
-    avg_csv = os.path.join(RESULTS_DIR, "comparison_average.csv")
-    df_avg.to_csv(avg_csv, index=False)
-
-    print("\n" + "=" * 95)
-    print(" BẢNG TỔNG HỢP SO SÁNH TRUNG BÌNH 3 TẬP DỮ LIỆU KIỂM THỬ (MACRO AVERAGE METRICS)")
-    print("=" * 95)
-    print(f"{'Mô hình':<12} | {'Precision':<10} | {'Recall':<10} | {'mAP@0.5':<10} | {'mAP@0.5:0.95':<14} | {'Suy luận (ms)':<15}")
-    print("-" * 95)
-    for _, row in df_avg.iterrows():
-        p_pct = f"{row['Precision']*100:.2f}%"
-        r_pct = f"{row['Recall']*100:.2f}%"
-        map50_pct = f"{row['mAP50']*100:.2f}%"
-        map95_pct = f"{row['mAP50-95']*100:.2f}%"
-        lat = f"{row['Inference_ms']:.2f} ms/ảnh"
-        print(f"{row['Model']:<12} | {p_pct:<10} | {r_pct:<10} | {map50_pct:<10} | {map95_pct:<14} | {lat:<15}")
-    print("=" * 95)
-
-    # Hiển thị bảng trung bình theo từng lớp (chỉ tính trung bình trên các tập có nhãn > 0)
     df_class_valid = df_class[df_class["Targets"] > 0]
+    df_class_avg = pd.DataFrame()
     if not df_class_valid.empty:
         df_class_avg = (
             df_class_valid.groupby(["Model", "Class"], as_index=False)
@@ -389,6 +526,7 @@ def run_evaluation(batch_size=1, imgsz=640, device="cpu"):
                 Datasets_Present=("Dataset", "count"),
                 Precision=("Precision", "mean"),
                 Recall=("Recall", "mean"),
+                F1=("F1", "mean"),
                 mAP50=("mAP50", "mean"),
                 mAP50_95=("mAP50-95", "mean"),
             )
@@ -396,59 +534,62 @@ def run_evaluation(batch_size=1, imgsz=640, device="cpu"):
         )
         df_class_avg["_order"] = df_class_avg["Model"].apply(lambda x: model_order.index(x) if x in model_order else 999)
         df_class_avg = df_class_avg.sort_values(["_order", "Class"]).drop(columns=["_order"]).reset_index(drop=True)
-        print("\n BẢNG TRUNG BÌNH THEO TỪNG LỚP ĐỐI TƯỢNG (CHỈ TÍNH TRÊN CÁC TẬP CÓ NHÃN > 0)")
-        print("-" * 95)
-        print(df_class_avg.to_string(index=False))
-        print("=" * 95)
 
-    print(f"[*] Đã lưu bảng tổng kết chi tiết tại : {summary_csv}")
-    print(f"[*] Đã lưu bảng chi tiết từng lớp tại : {class_csv}")
-    print(f"[*] Đã lưu bảng trung bình tại        : {avg_csv}")
+    df_specs.to_csv(os.path.join(RESULTS_DIR, "comparison_model_specs.csv"), index=False)
+    df_summary.to_csv(os.path.join(RESULTS_DIR, "comparison_summary.csv"), index=False)
+    df_class.to_csv(os.path.join(RESULTS_DIR, "comparison_per_class.csv"), index=False)
+    df_avg.to_csv(os.path.join(RESULTS_DIR, "comparison_average.csv"), index=False)
+    if not df_class_avg.empty:
+        df_class_avg.to_csv(os.path.join(RESULTS_DIR, "comparison_per_class_avg.csv"), index=False)
+
+    generate_comparison_charts(df_avg, df_summary, df_class_avg, df_specs)
+
+    print("\n" + "=" * 98)
+    print(" BẢNG TỔNG HỢP SO SÁNH TRUNG BÌNH 3 TẬP DỮ LIỆU KIỂM THỬ (MACRO AVERAGE METRICS)")
+    print("=" * 98)
+    print(f"{'Mô hình':<10} | {'Precision':<9} | {'Recall':<9} | {'F1-Score':<9} | {'mAP@0.5':<9} | {'mAP50-95':<9} | {'Suy luận (ms)':<14}")
+    print("-" * 98)
+    for _, row in df_avg.iterrows():
+        print(
+            f"{row['Model']:<10} | {row['Precision']*100:>8.2f}% | {row['Recall']*100:>8.2f}% | "
+            f"{row['F1']*100:>8.2f}% | {row['mAP50']*100:>8.2f}% | {row['mAP50-95']*100:>8.2f}% | "
+            f"{row['Inference_ms']:>8.2f} ms"
+        )
+    print("=" * 98)
+
+    if not df_class_avg.empty:
+        print("\n BẢNG TRUNG BÌNH THEO TỪNG LỚP ĐỐI TƯỢNG (5 LỚP)")
+        print("-" * 98)
+        print(df_class_avg.to_string(index=False))
+        print("=" * 98)
 
     return df_summary, df_avg
 
 
 def display_saved_results():
-    """Hiển thị nhanh kết quả đã đo đạc nếu file CSV đã tồn tại"""
     avg_csv = os.path.join(RESULTS_DIR, "comparison_average.csv")
     summary_csv = os.path.join(RESULTS_DIR, "comparison_summary.csv")
-    class_csv = os.path.join(RESULTS_DIR, "comparison_per_class.csv")
+    class_avg_csv = os.path.join(RESULTS_DIR, "comparison_per_class_avg.csv")
 
     if not os.path.exists(avg_csv):
         print("[*] Chưa có kết quả đo sẵn, bắt đầu chạy đánh giá trên dataset_test...")
         return run_evaluation()
 
     df_avg = pd.read_csv(avg_csv)
-    print("=" * 95)
-    print(" KẾT QUẢ SO SÁNH TRUNG BÌNH ĐÃ LƯU (YOLO11s VS YOLO26s)")
-    print("=" * 95)
+    print("=" * 98)
+    print(" KẾT QUẢ SO SÁNH TRUNG BÌNH ĐÃ LƯU (YOLO11s VS YOLO26s VS YOLO26m)")
+    print("=" * 98)
     print(df_avg.to_string(index=False))
-    if os.path.exists(class_csv):
-        df_class = pd.read_csv(class_csv)
-        if "Targets" in df_class.columns:
-            df_valid = df_class[df_class["Targets"] > 0]
-            if not df_valid.empty:
-                df_cavg = (
-                    df_valid.groupby(["Model", "Class"], as_index=False)
-                    .agg(
-                        Total_Targets=("Targets", "sum"),
-                        Datasets_Present=("Dataset", "count"),
-                        Precision=("Precision", "mean"),
-                        Recall=("Recall", "mean"),
-                        mAP50=("mAP50", "mean"),
-                        mAP50_95=("mAP50-95", "mean"),
-                    )
-                    .round(4)
-                )
-                print("-" * 95)
-                print(" TRUNG BÌNH THEO TỪNG LỚP (TẬP CÓ NHÃN > 0):")
-                print(df_cavg.to_string(index=False))
-    print("=" * 95)
+    if os.path.exists(class_avg_csv):
+        print("-" * 98)
+        print(" TRUNG BÌNH THEO TỪNG LỚP (5 LỚP):")
+        print(pd.read_csv(class_avg_csv).to_string(index=False))
+    print("=" * 98)
     return pd.read_csv(summary_csv), df_avg
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="So sánh YOLO11s vs YOLO26s trên dataset_test (đủ 5 lớp)")
+    parser = argparse.ArgumentParser(description="So sánh 3 mô hình YOLO11s vs YOLO26s vs YOLO26m trên dataset_test")
     parser.add_argument("--eval", action="store_true", help="Chạy lại toàn bộ quá trình validation trên dataset_test")
     parser.add_argument("--batch", type=int, default=1, help="Kích thước batch (Mặc định 1 để đo chuẩn latency)")
     parser.add_argument("--imgsz", type=int, default=640, help="Kích thước ảnh đầu vào")

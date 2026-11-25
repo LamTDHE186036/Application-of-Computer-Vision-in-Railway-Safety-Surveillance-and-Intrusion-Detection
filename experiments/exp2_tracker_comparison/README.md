@@ -1,82 +1,70 @@
-# THỰC NGHIỆM 2: ĐÁNH GIÁ & SO SÁNH GIẢI THUẬT TRACKING ĐA ĐỐI TƯỢNG (MOT)
+# THỰC NGHIỆM 2: ĐÁNH GIÁ & SO SÁNH GIẢI THUẬT TRACKING ĐA ĐỐI TƯỢNG (YOLO26s & YOLO26m)
 
-## 1. Đặt vấn đề & Bối cảnh thực tế trong An toàn Đường sắt
+## 1. Đặt vấn đề & Bối cảnh Thực tế trong An toàn Đường sắt
 
-Sau khi hoàn thành **Thực nghiệm 1** và lựa chọn được kiến trúc cốt lõi **YOLO26s** (`train-railway-yolo26s-all.pt`), mô hình này được sử dụng làm detector cơ sở để đánh giá và so sánh các giải thuật **Theo dõi đa đối tượng (Multi-Object Tracking - MOT)**.
+Sau **Thực nghiệm 1**, hai mô hình nòng cốt của chiến lược thích ứng phần cứng là **`YOLO26s`** (Edge Real-Time) và **`YOLO26m`** (High-Accuracy) được đưa vào đánh giá cùng các giải thuật **Theo dõi đa đối tượng (Multi-Object Tracking — MOT)**.
 
-Trong bài toán giám sát an toàn tại các đường ngang giao cắt đường sắt và các đoạn ray xung yếu, việc chỉ áp dụng **Mô hình Nhận diện đơn thuần (Object Detection)** theo từng khung hình (frame-by-frame) bộc lộ các hạn chế chí mạng:
+Nếu chỉ sử dụng phát hiện đơn khung hình (**Pure YOLO**), hệ thống không có định danh liên tục (`Track ID`) nên không thể đo thời gian lưu trú (*Dwell Time*, mặc định `5.0s`, tùy chỉnh `1–60s` ở chế độ *Không có tàu*) và dễ phát báo động giả khi phương tiện băng qua đường ngang hợp pháp hoặc bị che khuất tạm thời.
 
-1. **Không thể xác định thời gian lưu trú (Dwell-time Monitoring):**
-   - Người đi bộ hoặc xe máy qua đường ngang hợp pháp mất từ 2 đến 4 giây. Nếu phát hiện xâm nhập chỉ dựa vào việc đối tượng xuất hiện trong vùng nguy hiểm tại một khung hình đơn lẻ, hệ thống sẽ liên tục phát chuông báo động giả (False Alarm Fatigue), khiến nhân viên vận hành bị quá tải và phớt lờ cảnh báo thật.
-   - Để khắc phục, hệ thống cần tính năng **giám sát dừng đỗ / kẹt xe (Dwell Time Threshold $\ge 3.0s - 5.0s$)**. Để đếm thời gian này, hệ thống bắt buộc phải gán một **định danh duy nhất (Track ID)** liên tục cho đối tượng qua hàng chục hoặc hàng trăm khung hình. Nếu không có Tracking hoặc Tracking bị mất dấu (ID Switches), bộ đếm thời gian lưu trú sẽ bị reset liên tục, dẫn đến bỏ lọt xe chết máy trên ray (False Negative cực kỳ nguy hiểm).
-2. **Hiện tượng che khuất (Occlusion) và biến đổi ngoại hình:**
-   - Tại đường ngang, các phương tiện (ô tô, xe tải, người đi bộ) thường xuyên đi chéo hoặc che khuất một phần lẫn nhau. Các thuật toán tracking thông thường dễ đánh mất dấu hoặc nhảy sang ID mới (ID Switch), làm hỏng chuỗi theo dõi.
-
-Do đó, thực nghiệm này được thực hiện nhằm so sánh và chứng minh tính ưu việt của giải thuật **ByteTrack** so với **Không tracking (Pure YOLO)** và **BoT-SORT / DeepSORT**.
+Thực nghiệm so sánh trực tiếp 3 phương pháp trên **cả `YOLO26s` lẫn `YOLO26m`**:
+1. **Pure YOLO (No Tracking):** Baseline chỉ chạy detector từng khung hình.
+2. **BoT-SORT:** Theo dõi kết hợp Kalman Filter + bù chuyển động camera **GMC (`sparseOptFlow`)**.
+3. **ByteTrack (Đề xuất):** Liên kết hộp bao **2 giai đoạn (High-score & Low-score IoU)** + Kalman Filter (cấu hình `bytetrack.yaml`: `track_high_thresh=0.25`, `track_low_thresh=0.1`, `track_buffer=30`, `match_thresh=0.8`, `fuse_score=True`).
 
 ---
 
-## 2. Phương pháp & Nguyên lý các giải thuật so sánh
+## 2. Thiết lập Đo đạc
 
-| Giải thuật | Cơ chế liên kết (Data Association) | Sử dụng mạng Re-ID | Xử lý che khuất (Occlusion) | Độ phức tạp tính toán |
-| :--- | :--- | :---: | :--- | :--- |
-| **Pure Detection (Không tracking)** | Không có liên kết qua các khung hình. | ❌ Không | Không xử lý được (Mỗi frame là một tập box độc lập, không có ID). | 0 ms overhead ($O(1)$) |
-| **BoT-SORT / DeepSORT** | Liên kết kết hợp đặc trưng ngoại hình (Appearance Feature) + Bộ lọc Kalman & Camera Motion Compensation. | ✅ Có (hoặc tùy biến) | Dễ nhảy ID khi đối tượng bị biến dạng, quay lưng, ánh sáng chói hoặc bị che khuất $\ge 50\%$. | Cao (Chi phí tính toán ma trận cosine & so khớp phức tạp). |
-| **ByteTrack (Đề xuất)** | **Liên kết hai giai đoạn (Two-stage Association)** dựa trên ma trận tương đồng IoU + Bộ lọc Kalman Filter. | ❌ Không cần Re-ID | **Xuất sắc**: Hồi sinh các box có điểm tin cậy thấp (Low-score boxes) ở giai đoạn 2 để duy trì ID khi bị che khuất. | Thấp ($O(N \log N)$), tính toán ma trận IoU siêu nhẹ. |
-
-### Cơ chế liên kết 2 giai đoạn của ByteTrack:
-1. **Giai đoạn 1 (High-score association):** Ghép nối các vết theo dõi trước đó ($T$) với các detection có độ tin cậy cao ($D_{high}$, conf $\ge 0.5$) bằng Hungarian Algorithm trên ma trận IoU.
-2. **Giai đoạn 2 (Low-score association):** Thay vì vứt bỏ các detection có độ tin cậy thấp ($D_{low}$, $0.1 \le \text{conf} < 0.5$) như các thuật toán khác (thường coi là nhiễu nền), ByteTrack tận dụng chúng để ghép với các track $T_{remain}$ còn chưa ghép được từ bước 1. Điều này giúp hệ thống duy trì ID ổn định ngay cả khi người đi bộ bị rào chắn hoặc phương tiện khác che khuất một phần cơ thể.
-3. **Cơ chế lưu đệm vết theo dõi (Track Buffer = 30 frames):** Nếu đối tượng tạm thời biến mất hoàn toàn, bộ đệm vẫn duy trì trạng thái của đối tượng trong 30 khung hình (~1 giây ở 30 FPS). Khi đối tượng xuất hiện trở lại, ID cũ được khôi phục mà không bị tạo ID mới.
+- **Video thực địa:** `dataset_test/test_exp.mp4` (`150` khung hình đầu nạp trực tiếp vào RAM để loại trừ độ trễ đọc đĩa, `imgsz=640`, `conf=0.25`).
+- **Backend thực thi:** `Intel OpenVINO FP16` trên **Intel Iris Xe Graphics (`intel:gpu`)** — phản ánh chính xác pipeline vận hành thực tế với độ ổn định xung nhịp cao (giảm thiểu nhiễu thermal throttling của CPU).
+- **Quy trình đo công bằng:** Mỗi mô hình được nạp **1 instance duy nhất**, chạy `20` khung hình warmup ổn định xung nhịp phần cứng, sau đó reset tracker sạch và chạy `10` khung hình warmup riêng trước từng chế độ (`Pure YOLO`, `BoT-SORT`, `ByteTrack`).
 
 ---
 
-## 3. Kết quả Thực nghiệm & Đo đạc Hiệu năng Thực tế
-
-Thực nghiệm được thực hiện trên chuỗi video đường ngang thực tế `Dataset_test/test_exp.mp4` với mô hình nòng cốt **`YOLO26s`** (`train-railway-yolo26s-all.pt`). Quá trình đo áp dụng bước khởi động (Warmup 10 frames) để loại trừ triệt để độ trễ khởi tạo ban đầu.
-
-### Bảng 1: So sánh Toàn diện giữa các Giải thuật Tracking
+## 3. Kết quả Đo đạc Thực tế
 *(Trích xuất trực tiếp từ `results/tracker_comparison.csv`)*
 
-| STT | Phương pháp Tracking | Độ trễ trung bình (ms) | P95 Latency (ms) | Độ trễ bổ sung (Overhead) | Tốc độ (FPS) | Số ID độc lập (Unique IDs) | Vòng đời vệt trung bình | Khả năng đo Dwell Time |
-| :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| 1 | **Pure YOLO (No Tracking)** | 93.80 ms | 113.26 ms | **0.00 ms** (Gốc) | **10.7 FPS** | N/A | 0.0 frames | ❌ **Không thể đo** (Không có ID) |
-| 2 | **BoT-SORT / DeepSORT** | 120.90 ms | 159.97 ms | +27.10 ms | 8.3 FPS | 5 | 88.0 frames/ID | ⚠️ Khả thi nhưng nặng tải, P95 cao |
-| 3 | **ByteTrack (Đề xuất)** | **113.01 ms** | **126.55 ms** | **+19.21 ms** | **8.8 FPS** | **5** | **88.0 frames/ID** | ✅ **Khả thi & Tối ưu nhất** |
+| Mô hình Detector | Phương pháp Tracking | Độ trễ TB (ms) | P95 Latency (ms) | Overhead so với Pure YOLO | Tốc độ (FPS) | Số ID độc lập | Vòng đời vệt TB | Số lần đứt ID | Hỗ trợ Dwell Time |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| **`YOLO26s`** | Pure YOLO (No Tracking) | 29.27 ms | 32.46 ms | 0.00 ms (Gốc) | 34.2 FPS | N/A | 0.0 frames | N/A | ❌ Không thể đo |
+| *(OpenVINO iGPU)* | BoT-SORT | 33.94 ms | 35.65 ms | +4.67 ms | 29.5 FPS | 2 | 126.0 frames/ID | 6 | ⚠️ Tốn thêm GMC optical flow |
+| | **ByteTrack (Đề xuất)** | **29.54 ms** | **30.64 ms** | **+0.27 ms** | **33.9 FPS** | **2** | **126.0 frames/ID** | **6** | ✅ **Tối ưu nhất (-94.2% overhead)** |
+| **`YOLO26m`** | Pure YOLO (No Tracking) | 75.63 ms | 86.35 ms | 0.00 ms (Gốc) | 13.2 FPS | N/A | 0.0 frames | N/A | ❌ Không thể đo |
+| *(OpenVINO iGPU)* | BoT-SORT | 87.06 ms | 117.26 ms | +11.43 ms | 11.5 FPS | 2 | 129.5 frames/ID | 7 | ⚠️ Overhead & P95 tăng mạnh |
+| | **ByteTrack (Đề xuất)** | **75.17 ms** | **81.30 ms** | **≈ 0 ms** *(-0.46 ms)* | **13.3 FPS** | **2** | **129.5 frames/ID** | **7** | ✅ **Tối ưu nhất (nhanh hơn 11.89 ms)** |
+
+*(Ghi chú: Giá trị `-0.46 ms` trên `YOLO26m + ByteTrack` cho thấy chi phí thuật toán ByteTrack siêu nhẹ `< 0.5 ms/frame`, nằm gọn trong biên độ dao động xung nhịp tự nhiên của iGPU).*
 
 ---
 
 ## 4. Phân tích Khoa học & Thảo luận
 
-1. **Về chi phí tính toán bổ sung (Tracking Overhead) & độ ổn định P95:**
-   - **ByteTrack tiết kiệm 29.1% chi phí overhead** so với BoT-SORT (+19.21 ms vs +27.10 ms).
-   - Độ trễ P95 của ByteTrack ổn định ở mức **126.55 ms** (thấp hơn nhiều so với **159.97 ms** của BoT-SORT), giúp tránh hiện tượng sụt giảm khung hình đột ngột khi cảnh đông đúc phương tiện.
-   - Khi kết hợp cùng bộ tăng tốc phần cứng OpenVINO iGPU ở Thực nghiệm 3 (độ trễ detector chỉ ~28 ms), ByteTrack bảo đảm toàn bộ pipeline vận hành mượt mà vượt ngưỡng **30 FPS thời gian thực**.
-
-2. **Về độ ổn định định danh (ID Consistency) và bài toán Dwell-Time:**
-   - Cả hai thuật toán BoT-SORT và ByteTrack đều duy trì thành công các đối tượng với vòng đời trung bình **88.0 khung hình/ID**.
-   - ByteTrack đạt được độ ổn định này **mà không cần mạng Re-ID trích xuất đặc trưng ngoại hình phức tạp**, loại trừ rủi ro nhảy ID do chói sáng, góc camera rung hoặc khói bụi tàu hỏa.
-   - Bộ đếm thời gian lưu trú (Dwell-time tracker) hoạt động liên tục, phát hiện chính xác thời điểm đối tượng dừng đỗ trong khu vực nguy hiểm.
+1. **Chi phí bổ sung (Tracking Overhead) gần như bằng 0 với ByteTrack:**
+   - Trên **`YOLO26s`**, **ByteTrack** chỉ cộng thêm **`+0.27 ms/frame`** (giữ vững **`33.9 FPS`** và P95 **`30.64 ms`**), trong khi **BoT-SORT** tốn thêm **`+4.67 ms/frame`** (kéo FPS xuống dưới ngưỡng 30 FPS còn `29.5 FPS`) do phải chạy bù chuyển động camera `sparseOptFlow` không cần thiết cho camera đường sắt lắp cố định.
+   - Trên **`YOLO26m`**, **ByteTrack** nhanh hơn **BoT-SORT** tới **`11.89 ms/frame`** (`75.17 ms` vs `87.06 ms`) và giảm mạnh độ trễ đuôi P95 từ `117.26 ms` xuống **`81.30 ms`** (`-35.96 ms`).
+2. **Độ ổn định định danh (ID Consistency) tương đương mà không cần Re-ID / GMC:**
+   - Cả BoT-SORT và ByteTrack đều đạt chất lượng bám vết giống hệt nhau trên cùng detector (`126.0 frames/ID` với `YOLO26s` và `129.5 frames/ID` với `YOLO26m`), nhưng ByteTrack không tốn chi phí tính toán optical flow hay trích xuất đặc trưng ngoại hình.
+   - Ở camera đường sắt cố định (static CCTV), ByteTrack tận dụng liên kết IoU 2 tầng kết hợp `track_buffer = 30 frames` để duy trì ID ổn định qua che khuất tạm thời và phục vụ bộ đếm *Dwell Time* chính xác.
 
 ---
 
-## 5. Hướng dẫn chạy thử nghiệm mã nguồn
-
-Để tái lập kết quả đánh giá tracking trên máy tính của bạn:
+## 5. Hướng dẫn Tái hiện Thực nghiệm
 
 ```bash
-# 1. Chạy đánh giá trên video camera đường sắt thực nghiệm
-python experiments/exp2_tracker_comparison/benchmark_tracker.py --frames 100
+# Chạy đánh giá Tracking cho cả YOLO26s và YOLO26m trên OpenVINO iGPU (mặc định auto)
+python experiments/exp2_tracker_comparison/benchmark_tracker.py --frames 150 --backend openvino
 
-# 2. Hoặc chỉ định video và mô hình cụ thể
-python experiments/exp2_tracker_comparison/benchmark_tracker.py --video "Dataset_test/test_exp.mp4" --frames 100
+# Hoặc chạy trên PyTorch CPU
+python experiments/exp2_tracker_comparison/benchmark_tracker.py --frames 150 --backend pytorch
 ```
+
+Kết quả CSV và biểu đồ trực quan được lưu tại `results/tracker_comparison.csv` và `results/chart_tracker_comparison.png`.
 
 ---
 
 ## 6. Kết luận Thực nghiệm 2
 
-Giải thuật **ByteTrack** là sự lựa chọn tối ưu nhất cho hệ thống Giám sát An toàn Đường sắt:
-- Giải quyết triệt để bài toán đánh giá thời gian dừng đỗ (Dwell-time Violation) và chống báo động giả.
-- Chi phí tính toán bổ sung thấp hơn rõ rệt so với BoT-SORT, độ trễ P95 mượt mà.
-- **ByteTrack chính thức được tích hợp làm bộ theo dõi quỹ đạo mặc định của toàn hệ thống.**
+**ByteTrack** chứng minh tính ưu việt tuyệt đối trên **cả `YOLO26s` lẫn `YOLO26m`**:
+- Overhead siêu nhẹ (`+0.27 ms` trên `YOLO26s`, giảm **`94.2%`** so với BoT-SORT; nhanh hơn BoT-SORT **`11.89 ms`** trên `YOLO26m`).
+- Giữ vững **`33.9 FPS`** trên `YOLO26s + OpenVINO iGPU`, đảm bảo độ trễ P95 mượt mà và duy trì Track ID bền bỉ cho bài toán đo *Dwell Time*.
+- **ByteTrack chính thức được chọn làm bộ theo dõi mặc định cho toàn bộ hệ thống RailSafe-CV v1.3.0.**

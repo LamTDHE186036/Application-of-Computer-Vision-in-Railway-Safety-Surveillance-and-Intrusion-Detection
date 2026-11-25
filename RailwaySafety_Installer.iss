@@ -1,6 +1,6 @@
 ; Script Inno Setup tao bo cai dat chuyen nghiep cho He Thong Giam Sat Duong Sat
 #define MyAppName "He Thong Giam Sat An Toan Duong Sat"
-#define MyAppVersion "1.2.1"
+#define MyAppVersion "1.3.0"
 #define MyAppPublisher "Railway Safety Team"
 #define MyAppExeName "RailwaySafety.exe"
 

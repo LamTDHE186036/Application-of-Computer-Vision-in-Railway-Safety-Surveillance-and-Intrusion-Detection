@@ -52,7 +52,9 @@ def get_optimal_device():
 
 def check_system_resources():
     """
-    Kiểm tra tài nguyên phần cứng hệ thống để tối ưu hóa thiết bị suy luận (CUDA GPU / Intel iGPU / CPU) cho YOLO26s.
+    Kiểm tra tài nguyên phần cứng hệ thống để tự động lựa chọn mô hình tối ưu:
+    - Có GPU rời NVIDIA (CUDA): ưu tiên YOLO26m (độ chính xác cao nhất, dư sức Real-Time trên CUDA).
+    - Không có GPU rời (Intel Iris Xe iGPU / CPU): ưu tiên YOLO26s OpenVINO FP16 (đạt chuẩn Real-Time >= 30 FPS).
     """
     has_gpu = False
     gpu_name = None
@@ -69,7 +71,31 @@ def check_system_resources():
         "gpu_name": gpu_name
     }
 
-# --- NẠP MÔ HÌNH YOLO26s ---
+def _collect_model_candidates(base_dirs, model_folder, preferred_pt_names, prefer_pytorch=False):
+    candidates = []
+    for b_dir in base_dirs:
+        m_dir = os.path.join(b_dir, "models", model_folder)
+        pt_dir = os.path.join(m_dir, "model_pytorch")
+        ov_dir = os.path.join(m_dir, "model_openvino")
+
+        pt_files = [os.path.join(pt_dir, name) for name in preferred_pt_names]
+        if os.path.isdir(pt_dir):
+            for f in sorted(os.listdir(pt_dir)):
+                if f.endswith(".pt"):
+                    full_p = os.path.join(pt_dir, f)
+                    if full_p not in pt_files:
+                        pt_files.append(full_p)
+
+        ov_valid = [ov_dir] if os.path.isdir(ov_dir) else []
+        if prefer_pytorch:
+            candidates.extend(pt_files)
+            candidates.extend(ov_valid)
+        else:
+            candidates.extend(ov_valid)
+            candidates.extend(pt_files)
+    return candidates
+
+# --- NẠP MÔ HÌNH THÍCH ỨNG PHẦN CỨNG (ADAPTIVE HARDWARE-AWARE MODEL SELECTION) ---
 def load_yolo_model():
     base_dirs = [config.BASE_DIR]
     if hasattr(config, 'BUNDLE_DIR') and config.BUNDLE_DIR != config.BASE_DIR:
@@ -77,35 +103,27 @@ def load_yolo_model():
 
     res_info = check_system_resources()
 
-    print("=" * 75)
-    print(" HỆ THỐNG PHÂN TÍCH TÀI NGUYÊN & KHỞI ĐỘNG MÔ HÌNH YOLO26s")
+    # Phương án 2: Tự động chọn mô hình tối ưu theo phần cứng
+    # - Máy có NVIDIA CUDA GPU -> ưu tiên YOLO26m (.pt trên CUDA), dự phòng YOLO26s
+    # - Máy Intel iGPU / CPU   -> ưu tiên YOLO26s (OpenVINO FP16 trên Intel iGPU), dự phòng YOLO26m
+    if res_info["has_gpu"]:
+        target_label = "YOLO26m (Ưu tiên CUDA - Độ chính xác cao nhất)"
+        model_candidates = (
+            _collect_model_candidates(base_dirs, "yolo26m", ["yolo26m.pt", "best.pt"], prefer_pytorch=True)
+            + _collect_model_candidates(base_dirs, "yolo26s", ["train-railway-yolo26s-all.pt", "yolo26s.pt"], prefer_pytorch=True)
+        )
+    else:
+        target_label = "YOLO26s (Ưu tiên Intel OpenVINO iGPU/CPU - Chuẩn Real-Time >= 30 FPS)"
+        model_candidates = (
+            _collect_model_candidates(base_dirs, "yolo26s", ["train-railway-yolo26s-all.pt", "yolo26s.pt"], prefer_pytorch=False)
+            + _collect_model_candidates(base_dirs, "yolo26m", ["yolo26m.pt", "best.pt"], prefer_pytorch=False)
+        )
+
+    print("=" * 78)
+    print(" HỆ THỐNG PHÂN TÍCH TÀI NGUYÊN & TỰ ĐỘNG CHỌN MÔ HÌNH (ADAPTIVE SELECTION)")
     print(f"[*] Card đồ họa rời (NVIDIA GPU) : {res_info['gpu_name'] if res_info['has_gpu'] else 'Không có (Dùng Intel iGPU / CPU)'}")
-    print("[*] Mô hình kích hoạt           : YOLO26s (Mô hình phát hiện vi phạm đường sắt)")
-    print("=" * 75)
-
-    model_candidates = []
-    for b_dir in base_dirs:
-        m_dir = os.path.join(b_dir, "models", "yolo26s")
-        pt_dir = os.path.join(m_dir, "model_pytorch")
-        ov_dir = os.path.join(m_dir, "model_openvino")
-
-        pt_files = [
-            os.path.join(pt_dir, "train-railway-yolo26s-all.pt"),
-            os.path.join(pt_dir, "yolo26s.pt"),
-        ]
-        if os.path.exists(pt_dir):
-            for f in os.listdir(pt_dir):
-                if f.endswith(".pt"):
-                    full_p = os.path.join(pt_dir, f)
-                    if full_p not in pt_files:
-                        pt_files.append(full_p)
-
-        if res_info["has_gpu"]:
-            model_candidates.extend(pt_files)
-            model_candidates.append(ov_dir)
-        else:
-            model_candidates.append(ov_dir)
-            model_candidates.extend(pt_files)
+    print(f"[*] Chiến lược chọn mô hình      : {target_label}")
+    print("=" * 78)
 
     selected_model_path = None
     for p in model_candidates:
@@ -114,18 +132,19 @@ def load_yolo_model():
             break
 
     if not selected_model_path:
-        raise FileNotFoundError("Không tìm thấy mô hình trong thư mục models/yolo26s")
+        raise FileNotFoundError("Không tìm thấy mô hình trong thư mục models/yolo26s hoặc models/yolo26m")
 
     if "openvino" in selected_model_path.lower():
         device = get_optimal_device()
     else:
         device = "cuda" if res_info["has_gpu"] else "cpu"
 
+    active_name = "YOLO26m" if "yolo26m" in selected_model_path.lower() else "YOLO26s"
     model_instance = YOLO(selected_model_path)
-    print(f"[*] Đã nạp thành công mô hình: {selected_model_path} trên thiết bị {device}")
-    return model_instance, device
+    print(f"[*] Đã nạp thành công mô hình {active_name}: {selected_model_path} trên thiết bị {device}")
+    return model_instance, device, active_name
 
-model, DEVICE = load_yolo_model()
+model, DEVICE, ACTIVE_MODEL_NAME = load_yolo_model()
 
 # --- THƯ MỤC LƯU TRỮ DỮ LIỆU RUNTIME (DATA/) ---
 TXT_DIR = config.INTRUSION_LOGS_DIR

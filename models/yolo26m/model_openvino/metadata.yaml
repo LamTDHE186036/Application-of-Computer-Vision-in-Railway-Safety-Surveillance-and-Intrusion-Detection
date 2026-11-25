@@ -1,0 +1,28 @@
+description: Ultralytics YOLO26m model trained on C:\Users\Admin\Downloads\Đồ án\ket-qua\runs\dataset-lam-20261124-221409-1_kpx6pz\data.yaml
+author: Ultralytics
+date: '2026-11-25T09:48:34.607860+07:00'
+version: 8.4.165
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 32
+task: detect
+head: Detect
+batch: 1
+imgsz:
+- 640
+- 640
+names:
+  0: car
+  1: motorcycle
+  2: person
+  3: truck-bus
+  4: train
+args:
+  data: null
+  batch: 1
+  fraction: 1.0
+  quantize: 16
+  nms: null
+  dynamic: false
+channels: 3
+end2end: false
