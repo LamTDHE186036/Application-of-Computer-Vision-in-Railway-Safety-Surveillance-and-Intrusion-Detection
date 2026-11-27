@@ -55,5 +55,6 @@ runs/
 Thumbs.db
 desktop.ini
 
-# === File hướng dẫn cá nhân (không đẩy lên Git) ===
+# === File hướng dẫn cá nhân & hình báo cáo (không đẩy lên Git) ===
 HUONG_DAN_GIT.md
+report_figures/

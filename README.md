@@ -398,7 +398,7 @@ Script tự động chạy PyInstaller theo `RailwaySafety.spec`, loại trừ `
 ## 10. Tác giả và bản quyền
 
 - **Người thực hiện:** Group 1 (Trần Đại Lâm - Nguyễn Nhật Minh - Quản Lan Anh - Nguyễn Thái An)
-- **Giảng viên hướng dẫn:** Ths.Lê Đình Huynh
+- **Giảng viên hướng dẫn:** TS.Lê Đình Huynh
 - **Đề tài:** Ứng dụng thị giác máy tính trong giám sát an toàn và cảnh báo xâm phạm đường ngang đường sắt.
 - **Phiên bản:** `v1.3.0`
 - **Kho lưu trữ mã nguồn:** [Application-of-Computer-Vision-in-Railway-Safety-Surveillance-and-Intrusion-Detection](https://github.com/LamTDHE186036/Application-of-Computer-Vision-in-Railway-Safety-Surveillance-and-Intrusion-Detection.git)
