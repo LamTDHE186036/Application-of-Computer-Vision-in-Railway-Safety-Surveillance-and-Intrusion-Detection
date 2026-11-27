@@ -41,9 +41,11 @@
    - Nâng cấp `app/services/detector.py` tự động dò GPU rời NVIDIA CUDA để kích hoạt **`YOLO26m`** (`models/yolo26m/`), và tự động dùng **`YOLO26s` OpenVINO FP16** (`models/yolo26s/`) trên máy Intel iGPU/CPU — cân bằng tối ưu giữa độ chính xác và tốc độ Real-Time trên mọi cấu hình triển khai.
 2. **Bổ sung mô hình `YOLO26m` chuẩn PyTorch & Intel OpenVINO FP16:**
    - Hoàn thiện bộ công cụ `models/yolo26m/export_openvino.py` và lưu trữ sẵn trọng số OpenVINO FP16 tại `models/yolo26m/model_openvino/`.
-3. **Chuẩn hóa toàn bộ 3 Thực nghiệm Khoa học cho cả `YOLO11s`, `YOLO26s` và `YOLO26m`:**
+3. **Chuẩn hóa toàn bộ 5 Thực nghiệm Khoa học (`exp1`–`exp5`) phục vụ Chương 4 báo cáo:**
    - **Thực nghiệm 1:** Gộp đánh giá đối đầu **3 mô hình** (`YOLO11s` vs `YOLO26s` vs `YOLO26m`) trên 404 ảnh kiểm thử độc lập kèm 3 biểu đồ trực quan.
    - **Thực nghiệm 2 & 3:** Nâng cấp đánh giá Tracking MOT và Tăng tốc Phần cứng đồng thời cho **cả `YOLO26s` lẫn `YOLO26m`**, sửa lỗi giữ nguyên warmup trên cùng instance mô hình để đo chính xác Tracking Overhead.
+   - **Thực nghiệm 4:** Bổ sung bộ đánh giá tái lập (khóa SHA-256 checkpoint & ảnh) so sánh đối đầu **`YOLO26m` gốc COCO** và **`YOLO26m` fine-tune epoch 13** trên 119 ảnh `roboflow_crossing` kèm ma trận nhầm lẫn.
+   - **Thực nghiệm 5:** Đo phân rã thời gian chạy toàn luồng Web (`cap.read → model.track → process_and_draw → MJPEG`), phân tích định lượng ca báo sót ROI và cung cấp bộ chấm điểm cấp sự kiện ngoại tuyến (`tIoU`, `Event P/R/F1`, `FAR`, `Delay`).
 4. **Kế thừa trọn vẹn các tối ưu cốt lõi từ v1.2.1:**
    - Khắc phục triệt để lỗi lồng 2 lớp ROI (Double-ROI Bugfix), quét DirectShow đa nguồn Camera (Webcam / USB / OBS Virtual Camera) + chuyển nóng cổng camera, `LiveCameraCapture` Zero-Latency Buffer=1, Single Instance Mutex & Single-Tab Lock.
 5. **Đóng gói phát hành đồng bộ v1.3.0:**
@@ -184,11 +186,13 @@ RailSafe-CV/
 │       ├── model_openvino/          # Trọng số tối ưu hóa OpenVINO FP16 (.xml, .bin, metadata.yaml)
 │       └── export_openvino.py       # Script xuất OpenVINO cho YOLO26m
 │
-├── experiments/                     # Quy trình nghiên cứu khoa học và 3 thực nghiệm đối chứng
-│   ├── README.md                    # Báo cáo tổng hợp kết quả 3 thực nghiệm
+├── experiments/                     # Quy trình nghiên cứu khoa học và 5 thực nghiệm đối chứng
+│   ├── README.md                    # Báo cáo tổng hợp kết quả 5 thực nghiệm
 │   ├── exp1_model_comparison/       # Thực nghiệm 1: So sánh 3 mô hình YOLO11s vs YOLO26s vs YOLO26m
 │   ├── exp2_tracker_comparison/     # Thực nghiệm 2: So sánh Pure YOLO vs BoT-SORT vs ByteTrack (26s & 26m)
-│   └── exp3_hardware_acceleration/  # Thực nghiệm 3: Đo lường tăng tốc OpenVINO iGPU vs CPU (26s & 26m)
+│   ├── exp3_hardware_acceleration/  # Thực nghiệm 3: Đo lường tăng tốc OpenVINO iGPU vs CPU (26s & 26m)
+│   ├── exp4_yolo26m_thesis/         # Thực nghiệm 4: Đánh giá tái lập YOLO26m (COCO gốc vs Fine-tune, 119 ảnh)
+│   └── exp5_web_pipeline_evaluation/# Thực nghiệm 5: Hiệu năng thời gian chạy luồng Web & phân tích ca báo sót
 │
 ├── research/                        # Nhật ký và trọng số huấn luyện 3 mô hình
 │   └── finetune/
@@ -212,7 +216,7 @@ RailSafe-CV/
 
 ## 5. Quy trình nghiên cứu thực nghiệm khoa học
 
-Dự án được kiểm chứng qua 3 thực nghiệm đối chứng chuẩn hóa tại thư mục `experiments/` (xem báo cáo tổng hợp tại [experiments/README.md](experiments/README.md)):
+Dự án được kiểm chứng qua 5 thực nghiệm đối chứng chuẩn hóa tại thư mục `experiments/` (xem báo cáo tổng hợp tại [experiments/README.md](experiments/README.md)):
 
 ### 5.1. Thực nghiệm 1: So sánh 3 kiến trúc mô hình (YOLO11s vs YOLO26s vs YOLO26m)
 - **Mục tiêu:** Đánh giá chéo 3 mô hình 5 lớp trên 3 tập kiểm thử độc lập (**404 ảnh / 1.238 đối tượng**: `roboflow_crossing`, `rcd_ground`, `rcd_elevated`).
@@ -265,6 +269,37 @@ Dự án được kiểm chứng qua 3 thực nghiệm đối chứng chuẩn h�
 | **`YOLO26m`** | PyTorch (`.pt`) | Intel CPU | 288.49 ms | 304.97 ms | 3.5 FPS | 1.00x | Không đạt |
 | **`YOLO26m`** | OpenVINO FP16 (`.xml`) | Intel CPU | 281.31 ms | 739.30 ms | 3.6 FPS | 1.03x | Không đạt |
 | **`YOLO26m`** | **OpenVINO FP16 (`.xml`)** | **Intel Iris Xe iGPU** | **86.85 ms** | **93.21 ms** | **11.5 FPS** | **3.32x** | **Chưa đạt trên iGPU** |
+
+### 5.4. Thực nghiệm 4: Đánh giá tái lập YOLO26m trên bộ test 119 ảnh (COCO Pretrained vs Fine-tune)
+- **Mục tiêu:** Đánh giá có kiểm chứng SHA-256 giữa `YOLO26m` gốc COCO (chiếu 5 lớp với `ProjectedClassifier`, gộp `truck`/`bus` về `truck-bus`) và `YOLO26m` fine-tune epoch 13 trên 119 ảnh / 707 hộp nhãn (`roboflow_crossing`), kèm vẽ ma trận nhầm lẫn so sánh.
+- **Lệnh chạy:**
+  ```bash
+  python experiments/exp4_yolo26m_thesis/score.py path/to/dataset_test path/to/yolo26m-coco.pt path/to/best.pt ../runs/yolo26m-thesis-119 --source roboflow_crossing --device 0
+  python experiments/exp4_yolo26m_thesis/plot_confusion_matrix.py ../runs/yolo26m-thesis-119
+  ```
+- **Kết quả đo đạc** *(ngưỡng cố định `conf = 0.35`, `IoU = 0.50`)*:
+
+| Mô hình | mAP@0.5 | mAP@0.5:0.95 | Precision (micro) | Recall (micro) |
+| :--- | :---: | :---: | :---: | :---: |
+| `YOLO26m` gốc COCO | 82.46% | 64.51% | **83.67%** | 65.21% |
+| **`YOLO26m` fine-tune epoch 13** | **86.11%** | **65.54%** | 79.57% | **73.27%** |
+
+### 5.5. Thực nghiệm 5: Đánh giá hiệu năng luồng Web và phân tích ca báo sót
+- **Mục tiêu:** Phân rã thời gian chạy toàn bộ luồng Web (`cap.read → model.track → process_and_draw → imencode`) trên video thực tế `demo1` ($1272 \times 720$, $30\ \mathrm{FPS}$, $774$ khung đo với `YOLO26s` OpenVINO FP16 trên Intel Iris Xe iGPU), chẩn đoán 3 nhóm nguyên nhân báo sót trên ROI và cung cấp bộ chấm điểm cấp sự kiện ngoại tuyến (`tIoU`, `Event P/R/F1`, `FAR`, `Delay`).
+- **Lệnh chạy:**
+  ```bash
+  python experiments/exp5_web_pipeline_evaluation/evaluate_web_pipeline.py
+  python experiments/exp5_web_pipeline_evaluation/evaluate_events_offline.py --self-test
+  ```
+- **Kết quả phân rã thời gian luồng Web:**
+
+| Công đoạn trên luồng Web | Trung bình (ms) | Trung vị (ms) | P95 (ms) | Tỷ trọng |
+| :--- | :---: | :---: | :---: | :---: |
+| 1. Đọc khung hình (`cap.read`) | 2.12 | 1.95 | 2.92 | 5.4% |
+| 2. Suy luận + Tracking (`model.track`) | 31.47 | 30.99 | 34.84 | 79.7% |
+| 3. Xử lý ROI + Cảnh báo + Vẽ phủ (`process_and_draw`) | 3.27 | 3.11 | 4.30 | 8.3% |
+| 4. Mã hóa MJPEG (`JPEG quality=80`) | 2.60 | 2.48 | 3.35 | 6.6% |
+| **Tổng toàn luồng Web** | **39.47** | **38.79** | **43.79** | **100.0% (25.3 FPS)** |
 
 ---
 

@@ -1,0 +1,6 @@
+stage,mean_ms,median_ms,p95_ms,share_pct
+1. Doc khung hinh (cap.read),2.12,1.95,2.92,5.4
+2. Suy luan + Tracking (model.track),31.47,30.99,34.84,79.7
+3. Nghiep vu ROI + Canh bao + Ve phu,3.27,3.11,4.30,8.3
+4. Ma hoa MJPEG (JPEG quality=80),2.60,2.48,3.35,6.6
+Tong toan luong Web,39.47,38.79,43.79,100.0

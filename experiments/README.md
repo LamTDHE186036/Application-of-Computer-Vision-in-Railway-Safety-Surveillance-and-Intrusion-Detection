@@ -1,7 +1,7 @@
 # BÁO CÁO NGHIÊN CỨU THỰC NGHIỆM VÀ ĐÁNH GIÁ HỆ THỐNG (v1.3.0)
 ## Ứng dụng Thị giác Máy tính trong Giám sát An toàn Đường sắt và Phát hiện Xâm nhập
 
-Tài liệu này tổng hợp toàn bộ phương pháp luận, quy trình triển khai và số liệu thực nghiệm đo đạc thực tế của **03 bài toán nghiên cứu cốt lõi** trong hệ thống **RailSafe-CV v1.3.0** (tích hợp trực tiếp vào **Chương 4 — Validation** của báo cáo đồ án tốt nghiệp).
+Tài liệu này tổng hợp toàn bộ phương pháp luận, quy trình triển khai và số liệu thực nghiệm đo đạc thực tế của **05 bài toán thực nghiệm cốt lõi** trong hệ thống **RailSafe-CV v1.3.0** (tích hợp trực tiếp vào **Chương 4 — Validation** của báo cáo đồ án tốt nghiệp).
 
 ---
 
@@ -11,7 +11,9 @@ Tài liệu này tổng hợp toàn bộ phương pháp luận, quy trình tri�
 2. [Thực nghiệm 1: So sánh 3 Kiến trúc Mô hình Nhận diện (YOLO11s vs YOLO26s vs YOLO26m)](#2-thực-nghiệm-1-so-sánh-3-kiến-trúc-mô-hình-nhận-diện-yolo11s-vs-yolo26s-vs-yolo26m)
 3. [Thực nghiệm 2: Đánh giá Giải thuật Tracking Đa Đối tượng (YOLO26s & YOLO26m)](#3-thực-nghiệm-2-đánh-giá-giải-thuật-tracking-đa-đối-tượng-yolo26s--yolo26m)
 4. [Thực nghiệm 3: Tăng tốc Phần cứng & Tối ưu hóa Suy luận (YOLO26s & YOLO26m)](#4-thực-nghiệm-3-tăng-tốc-phần-cứng--tối-ưu-hóa-suy-luận-yolo26s--yolo26m)
-5. [Tổng kết Kiến trúc Chọn Mô hình Thích ứng Phần cứng (v1.3.0)](#5-tổng-kết-kiến-trúc-chọn-mô-hình-thích-ứng-phần-cứng-v130)
+5. [Thực nghiệm 4: Đánh giá Tái lập YOLO26m trên Bộ Test 119 Ảnh (COCO Pretrained vs Fine-tune)](#5-thực-nghiệm-4-đánh-giá-tái-lập-yolo26m-trên-bộ-test-119-ảnh-coco-pretrained-vs-fine-tune)
+6. [Thực nghiệm 5: Đánh giá Hiệu năng Thời gian chạy Luồng Web & Phân tích Ca Báo sót](#6-thực-nghiệm-5-đánh-giá-hiệu-năng-thời-gian-chạy-luồng-web--phân-tích-ca-báo-sót)
+7. [Tổng kết Kiến trúc Chọn Mô hình Thích ứng Phần cứng (v1.3.0)](#7-tổng-kết-kiến-trúc-chọn-mô-hình-thích-ứng-phần-cứng-v130)
 
 ---
 
@@ -19,7 +21,7 @@ Tài liệu này tổng hợp toàn bộ phương pháp luận, quy trình tri�
 
 ```text
 experiments/
-├── README.md                           # Báo cáo tổng hợp toàn bộ 3 thực nghiệm (v1.3.0)
+├── README.md                           # Báo cáo tổng hợp toàn bộ 5 thực nghiệm (v1.3.0)
 │
 ├── exp1_model_comparison/              # THỰC NGHIỆM 1: SO SÁNH 3 MÔ HÌNH (YOLO11s vs YOLO26s vs YOLO26m)
 │   ├── README.md                       # Báo cáo chi tiết Thực nghiệm 1
@@ -32,10 +34,22 @@ experiments/
 │   ├── bytetrack.yaml                  # Cấu hình tham số ByteTrack
 │   └── results/                        # tracker_comparison.csv & chart_tracker_comparison.png
 │
-└── exp3_hardware_acceleration/         # THỰC NGHIỆM 3: TĂNG TỐC PHẦN CỨNG (YOLO26s & YOLO26m)
-    ├── README.md                       # Báo cáo chi tiết Thực nghiệm 3
-    ├── benchmark_hardware.py           # Script benchmark PyTorch CPU vs OpenVINO CPU & Iris Xe iGPU
-    └── results/                        # hardware_benchmark.csv & chart_hardware_benchmark.png
+├── exp3_hardware_acceleration/         # THỰC NGHIỆM 3: TĂNG TỐC PHẦN CỨNG (YOLO26s & YOLO26m)
+│   ├── README.md                       # Báo cáo chi tiết Thực nghiệm 3
+│   ├── benchmark_hardware.py           # Script benchmark PyTorch CPU vs OpenVINO CPU & Iris Xe iGPU
+│   └── results/                        # hardware_benchmark.csv & chart_hardware_benchmark.png
+│
+├── exp4_yolo26m_thesis/                # THỰC NGHIỆM 4: ĐÁNH GIÁ TÁI LẬP YOLO26m (COCO vs FINE-TUNE, 119 ẢNH)
+│   ├── README.md                       # Hướng dẫn tái lập và tổng hợp kết quả đánh giá thesis
+│   ├── score.py                        # Script chấm khóa SHA-256 checkpoint & ProjectedClassifier 5 lớp
+│   ├── image_metrics.py                # Hàm tính AP50, AP50-95 và Precision/Recall ngưỡng cố định
+│   └── plot_confusion_matrix.py        # Script vẽ ma trận nhầm lẫn so sánh 2 mô hình
+│
+└── exp5_web_pipeline_evaluation/       # THỰC NGHIỆM 5: HIỆU NĂNG LUỒNG WEB & PHÂN TÍCH CA BÁO SÓT
+    ├── README.md                       # Báo cáo chi tiết Thực nghiệm 5 (Mục 4.3.4 & 4.3.5)
+    ├── evaluate_web_pipeline.py        # Script phân rã độ trễ toàn luồng Web & chẩn đoán ca báo sót ROI
+    ├── evaluate_events_offline.py      # Bộ chấm điểm cấp độ sự kiện ngoại tuyến (tIoU, Event P/R/F1, FAR, Delay)
+    └── results/                        # web_pipeline_runtime.csv & web_pipeline_diagnostics.json
 ```
 
 ---
@@ -105,9 +119,38 @@ experiments/
 
 ---
 
-## 5. Tổng kết Kiến trúc Chọn Mô hình Thích ứng Phần cứng (v1.3.0)
+## 5. Thực nghiệm 4: Đánh giá Tái lập YOLO26m trên Bộ Test 119 Ảnh (COCO Pretrained vs Fine-tune)
 
-Từ bằng chứng định lượng của cả 3 thực nghiệm, hệ thống **RailSafe-CV v1.3.0** triển khai cơ chế **Adaptive Hardware-Aware Model Selection** trong `app/services/detector.py`:
+*(So sánh có kiểm chứng SHA-256 giữa `YOLO26m gốc COCO` và `YOLO26m fine-tune epoch 13` trên 119 ảnh / 707 hộp nhãn thuộc `roboflow_crossing`, 5 lớp `car`, `motorcycle`, `person`, `truck-bus`, `train`, trích từ [exp4_yolo26m_thesis/README.md](exp4_yolo26m_thesis/README.md))*
+
+| Mô hình | mAP@0.5 | mAP@0.5:0.95 | Precision (micro, conf 0.35) | Recall (micro, conf 0.35) |
+| :--- | :---: | :---: | :---: | :---: |
+| `YOLO26m` gốc COCO *(Projected 5 lớp)* | 82.46% | 64.51% | **83.67%** | 65.21% |
+| **`YOLO26m` fine-tune epoch 13** | **86.11%** | **65.54%** | 79.57% | **73.27%** |
+
+- **Kết luận:** Fine-tune trên miền đường ngang nâng mạnh **`+3.65%` mAP@0.5**, **`+1.03%` mAP@0.5:0.95** và đặc biệt tăng **`+8.06%` Recall (micro)** ở ngưỡng cố định `conf = 0.35, IoU = 0.50`, giảm đáng kể tình trạng bỏ sót đối tượng trong kịch bản giám sát an toàn.
+
+---
+
+## 6. Thực nghiệm 5: Đánh giá Hiệu năng Thời gian chạy Luồng Web & Phân tích Ca Báo sót
+
+*(Đo trực tiếp chuỗi xử lý luồng Web hoàn chỉnh trên video đường ngang thực tế `demo1` — $1272 \times 720$, $30\ \mathrm{FPS}$, $774$ khung hình đo sau $20$ khung khởi động với `YOLO26s` OpenVINO FP16 trên Intel Iris Xe iGPU, trích từ [exp5_web_pipeline_evaluation/README.md](exp5_web_pipeline_evaluation/README.md))*
+
+| Công đoạn trên luồng Web | Trung bình (ms) | Trung vị (ms) | P95 (ms) | Tỷ trọng |
+| :--- | :---: | :---: | :---: | :---: |
+| 1. Đọc khung hình (`cap.read`) | 2.12 | 1.95 | 2.92 | 5.4% |
+| 2. Suy luận + Tracking (`model.track`) | 31.47 | 30.99 | 34.84 | 79.7% |
+| 3. Xử lý ROI + Cảnh báo + Vẽ phủ (`process_and_draw`) | 3.27 | 3.11 | 4.30 | 8.3% |
+| 4. Mã hóa MJPEG (`JPEG quality=80`) | 2.60 | 2.48 | 3.35 | 6.6% |
+| **Tổng toàn luồng Web** | **39.47** | **38.79** | **43.79** | **100.0% (25.3 FPS)** |
+
+- **Chẩn đoán ca báo sót / lọc bỏ trên ROI:** Ghi nhận **13 khoảng mất hộp bao ngắn** (1–7 khung hình, dài nhất `Motorcycle ID:38` 7 khung / 0.23 s do chói đèn pha & nhòe chuyển động), **0 ca đổi ID** nhờ `track_buffer = 30` của ByteTrack, **2 quỹ đạo `< 0.5 s`** không kích hoạt báo động đỏ và **1 quỹ đạo `0.5–1.0 s`** (`Person ID:10` 0.83 s) bị lọc bỏ khi chốt sự kiện theo ngưỡng `MIN_EVENT_DURATION = 1.0 s`. Đi kèm bộ công cụ đánh giá cấp sự kiện ngoại tuyến `evaluate_events_offline.py` (`tIoU`, `Event Precision/Recall/F1`, `FAR`, `Alert Detection Delay`).
+
+---
+
+## 7. Tổng kết Kiến trúc Chọn Mô hình Thích ứng Phần cứng (v1.3.0)
+
+Từ bằng chứng định lượng của chuỗi thực nghiệm trên, hệ thống **RailSafe-CV v1.3.0** triển khai cơ chế **Adaptive Hardware-Aware Model Selection** trong `app/services/detector.py`:
 
 ```text
                     KHỞI ĐỘNG HỆ THỐNG RAILSAFE-CV v1.3.0
