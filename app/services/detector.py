@@ -1,4 +1,6 @@
 import cv2
+import ctypes
+from ctypes import wintypes
 import numpy as np
 from ultralytics import YOLO
 import time
@@ -6,11 +8,17 @@ import datetime
 import os
 import json
 import re
+import subprocess
 from collections import deque
 import openvino as ov
 
 
-# Cho phép Ultralytics tự động nhận diện thư mục model_openvino theo kiến trúc dự án
+# Trạng thái DirectML toàn cục (được cấu hình bởi load_yolo_model trước khi nạp .onnx)
+_DML_ENABLED = False
+_DML_DEVICE_ID = 0
+
+
+# Cho phép Ultralytics tự động nhận diện thư mục model_openvino và chạy ONNX bằng DirectML (Windows DX12)
 try:
     from ultralytics.nn import autobackend
     _orig_model_type = autobackend.AutoBackend._model_type
@@ -22,6 +30,52 @@ try:
         return fmt
 
     autobackend.AutoBackend._model_type = staticmethod(_patched_model_type)
+except Exception:
+    pass
+
+try:
+    from ultralytics.nn.backends import onnx as _ultralytics_onnx_backend
+    import torch as _torch
+
+    def _patched_onnx_load_model(self, weight):
+        if not isinstance(self.device, _torch.device):
+            self.device = _torch.device("cpu")
+        self.apply_metadata(self.read_metadata(weight))
+
+        if self.format == "dnn":
+            self.net = cv2.dnn.readNetFromONNX(str(weight))
+            return
+
+        import onnxruntime
+
+        available = onnxruntime.get_available_providers()
+        sess_options = self.session_options or onnxruntime.SessionOptions()
+        use_cuda = _torch.cuda.is_available() and self.device.type != "cpu" and "CUDAExecutionProvider" in available
+
+        if _DML_ENABLED and "DmlExecutionProvider" in available:
+            sess_options.enable_mem_pattern = False
+            sess_options.execution_mode = onnxruntime.ExecutionMode.ORT_SEQUENTIAL
+            sess_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+            providers = [("DmlExecutionProvider", {"device_id": int(_DML_DEVICE_ID)}), "CPUExecutionProvider"]
+            self.device = _torch.device("cpu")
+            use_cuda = False
+        elif use_cuda:
+            providers = [("CUDAExecutionProvider", {"device_id": self.device.index or 0}), "CPUExecutionProvider"]
+        elif self.device.type == "mps" and "CoreMLExecutionProvider" in available:
+            providers = ["CoreMLExecutionProvider", "CPUExecutionProvider"]
+        else:
+            providers = ["CPUExecutionProvider"]
+
+        self.session = onnxruntime.InferenceSession(str(weight), sess_options, providers=providers)
+        if _DML_ENABLED and "DmlExecutionProvider" not in self.session.get_providers():
+            raise RuntimeError("DmlExecutionProvider không khởi tạo được cho phiên ONNX Runtime")
+
+        self.output_names = [x.name for x in self.session.get_outputs()]
+        self.dynamic = isinstance(self.session.get_outputs()[0].shape[0], str)
+        self.fp16 = "float16" in self.session.get_inputs()[0].type
+        self.use_io_binding = False
+
+    _ultralytics_onnx_backend.ONNXBackend.load_model = _patched_onnx_load_model
 except Exception:
     pass
 
@@ -50,26 +104,173 @@ def get_optimal_device():
         pass
     return "cpu"
 
+def _detect_dxgi_gpus():
+    """
+    Liệt kê danh sách GPU trên Windows qua DXGI (CreateDXGIFactory1) theo đúng thứ tự device_id của DirectML.
+    Không cần cài thêm thư viện ngoài hay nvidia-smi; nhận diện được cả NVIDIA RTX/GTX, AMD Radeon và Intel GPU.
+    """
+    gpus = []
+    if os.name != "nt":
+        return gpus
+    try:
+        class _LUID(ctypes.Structure):
+            _fields_ = [("LowPart", wintypes.DWORD), ("HighPart", wintypes.LONG)]
+
+        class _DXGI_ADAPTER_DESC1(ctypes.Structure):
+            _fields_ = [
+                ("Description", wintypes.WCHAR * 128),
+                ("VendorId", wintypes.UINT),
+                ("DeviceId", wintypes.UINT),
+                ("SubSysId", wintypes.UINT),
+                ("Revision", wintypes.UINT),
+                ("DedicatedVideoMemory", ctypes.c_size_t),
+                ("DedicatedSystemMemory", ctypes.c_size_t),
+                ("SharedSystemMemory", ctypes.c_size_t),
+                ("AdapterLuid", _LUID),
+                ("Flags", wintypes.UINT),
+            ]
+
+        class _GUID(ctypes.Structure):
+            _fields_ = [
+                ("Data1", wintypes.DWORD),
+                ("Data2", wintypes.WORD),
+                ("Data3", wintypes.WORD),
+                ("Data4", ctypes.c_ubyte * 8),
+            ]
+
+        iid_factory1 = _GUID(
+            0x770AAE78, 0xF26F, 0x4DBA,
+            (ctypes.c_ubyte * 8)(0xA8, 0x29, 0x25, 0x3C, 0x83, 0xD1, 0xB3, 0x87),
+        )
+        dxgi = ctypes.windll.dxgi
+        factory = ctypes.c_void_p()
+        hr = dxgi.CreateDXGIFactory1(ctypes.byref(iid_factory1), ctypes.byref(factory))
+        if hr != 0 or not factory.value:
+            return gpus
+
+        vtable = ctypes.cast(
+            ctypes.cast(factory, ctypes.POINTER(ctypes.c_void_p))[0],
+            ctypes.POINTER(ctypes.c_void_p),
+        )
+        enum_adapters1 = ctypes.WINFUNCTYPE(
+            ctypes.c_long, ctypes.c_void_p, wintypes.UINT, ctypes.POINTER(ctypes.c_void_p)
+        )(vtable[12])
+        release_factory = ctypes.WINFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p)(vtable[2])
+
+        idx = 0
+        try:
+            while True:
+                adapter = ctypes.c_void_p()
+                if enum_adapters1(factory, idx, ctypes.byref(adapter)) != 0:
+                    break
+                avt = ctypes.cast(
+                    ctypes.cast(adapter, ctypes.POINTER(ctypes.c_void_p))[0],
+                    ctypes.POINTER(ctypes.c_void_p),
+                )
+                get_desc1 = ctypes.WINFUNCTYPE(
+                    ctypes.c_long, ctypes.c_void_p, ctypes.POINTER(_DXGI_ADAPTER_DESC1)
+                )(avt[10])
+                release_adapter = ctypes.WINFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p)(avt[2])
+                desc = _DXGI_ADAPTER_DESC1()
+                if get_desc1(adapter, ctypes.byref(desc)) == 0:
+                    is_software = bool(desc.Flags & 2)  # DXGI_ADAPTER_FLAG_SOFTWARE
+                    vram_mb = int(desc.DedicatedVideoMemory // (1024 * 1024))
+                    gpus.append({
+                        "index": idx,
+                        "name": desc.Description.strip(),
+                        "vendor_id": int(desc.VendorId),
+                        "vram_mb": vram_mb,
+                        "is_software": is_software,
+                    })
+                release_adapter(adapter)
+                idx += 1
+        finally:
+            release_factory(factory)
+    except Exception:
+        pass
+    return gpus
+
+
+def _pick_discrete_gpu(gpus):
+    """Chọn GPU rời mạnh nhất (NVIDIA RTX/GTX, AMD Radeon RX, Intel Arc) và trả về info kèm DirectML device_id."""
+    candidates = []
+    for g in gpus:
+        if g["is_software"]:
+            continue
+        vid = g["vendor_id"]
+        vram = g["vram_mb"]
+        # 0x10DE = NVIDIA (luôn là GPU rời), 0x1002 = AMD (rời >= 1GB VRAM), 0x8086 = Intel Arc rời (>= 2GB VRAM)
+        is_discrete = (
+            vid == 0x10DE
+            or (vid == 0x1002 and vram >= 1024)
+            or (vid == 0x8086 and vram >= 2048)
+        )
+        if is_discrete:
+            candidates.append(g)
+    if not candidates:
+        return None
+    # Ưu tiên NVIDIA trước, sau đó theo dung lượng VRAM lớn nhất
+    candidates.sort(key=lambda x: (x["vendor_id"] == 0x10DE, x["vram_mb"]), reverse=True)
+    return candidates[0]
+
+
 def check_system_resources():
     """
-    Kiểm tra tài nguyên phần cứng hệ thống để tự động lựa chọn mô hình tối ưu:
-    - Có GPU rời NVIDIA (CUDA): chọn YOLO26m (ưu tiên OpenVINO, lỗi thì fallback sang .pt).
-    - Không có GPU rời (Intel iGPU / CPU): chọn YOLO26s (ưu tiên OpenVINO, lỗi thì fallback sang .pt).
+    Kiểm tra phần cứng GPU hệ thống để chọn mô hình và backend suy luận tối ưu:
+    - Có GPU rời (NVIDIA RTX/GTX, AMD Radeon...) + ONNX Runtime DirectML:
+      chọn YOLO26m chạy ONNX + DirectML (DirectX 12) trực tiếp trên GPU rời.
+    - Có GPU NVIDIA + PyTorch CUDA (nếu môi trường dev cài torch+cu): hỗ trợ fallback .pt trên CUDA.
+    - Không có GPU rời (Intel Iris Xe / UHD iGPU hoặc CPU):
+      chọn YOLO26s chạy Intel OpenVINO (intel:gpu / cpu).
     """
-    has_gpu = False
-    gpu_name = None
+    has_dml = False
+    ort_version = None
     try:
-        import torch
-        if torch.cuda.is_available() and torch.cuda.device_count() > 0:
-            has_gpu = True
-            gpu_name = torch.cuda.get_device_name(0)
+        import onnxruntime as ort
+        ort_version = getattr(ort, "__version__", "unknown")
+        has_dml = "DmlExecutionProvider" in ort.get_available_providers()
     except Exception:
         pass
 
+    dxgi_gpus = _detect_dxgi_gpus()
+    discrete_gpu = _pick_discrete_gpu(dxgi_gpus)
+
+    has_cuda = False
+    cuda_gpu_name = None
+    torch_version = "unknown"
+    torch_cuda = None
+    try:
+        import torch
+        torch_version = getattr(torch, "__version__", "unknown")
+        torch_cuda = getattr(torch.version, "cuda", None)
+        if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+            has_cuda = True
+            cuda_gpu_name = torch.cuda.get_device_name(0)
+    except Exception:
+        pass
+
+    use_directml = bool(discrete_gpu is not None and has_dml)
+    has_gpu = use_directml or has_cuda
+    gpu_name = (
+        discrete_gpu["name"]
+        if discrete_gpu is not None
+        else cuda_gpu_name
+    )
+    dml_device_id = discrete_gpu["index"] if discrete_gpu is not None else 0
+
     return {
         "has_gpu": has_gpu,
-        "gpu_name": gpu_name
+        "gpu_name": gpu_name,
+        "use_directml": use_directml,
+        "has_dml": has_dml,
+        "dml_device_id": dml_device_id,
+        "discrete_gpu": discrete_gpu,
+        "has_cuda": has_cuda,
+        "ort_version": ort_version,
+        "torch_version": torch_version,
+        "torch_cuda": torch_cuda,
     }
+
 
 def _is_valid_openvino_dir(ov_dir):
     if not os.path.isdir(ov_dir):
@@ -77,18 +278,31 @@ def _is_valid_openvino_dir(ov_dir):
     files = os.listdir(ov_dir)
     return any(f.endswith(".xml") for f in files) and any(f.endswith(".bin") for f in files)
 
-def _collect_model_candidates(base_dirs, model_folder, preferred_pt_names):
+
+def _collect_model_candidates(base_dirs, model_folder, preferred_pt_names, preferred_onnx_names, mode="openvino"):
     """
-    Luôn ưu tiên OpenVINO trước; chỉ dùng .pt dự phòng khi thư mục OpenVINO thiếu hoặc nạp lỗi.
+    Thu thập danh sách ứng viên mô hình theo chế độ phần cứng:
+    - mode="directml": ưu tiên ONNX (.onnx chạy DirectML trên GPU rời) -> OpenVINO -> .pt
+    - mode="cuda": ưu tiên .pt (chạy CUDA) -> ONNX -> OpenVINO
+    - mode="openvino": ưu tiên OpenVINO (Intel iGPU / CPU) -> ONNX -> .pt
     """
     candidates = []
     for b_dir in base_dirs:
         m_dir = os.path.join(b_dir, "models", model_folder)
+        onnx_dir = os.path.join(m_dir, "model_onnx")
         pt_dir = os.path.join(m_dir, "model_pytorch")
         ov_dir = os.path.join(m_dir, "model_openvino")
 
-        if _is_valid_openvino_dir(ov_dir):
-            candidates.append(ov_dir)
+        onnx_files = [os.path.join(onnx_dir, name) for name in preferred_onnx_names]
+        if os.path.isdir(onnx_dir):
+            for f in sorted(os.listdir(onnx_dir)):
+                if f.endswith(".onnx"):
+                    full_p = os.path.join(onnx_dir, f)
+                    if full_p not in onnx_files:
+                        onnx_files.append(full_p)
+        onnx_candidates = [p for p in onnx_files if os.path.isfile(p)]
+
+        ov_candidates = [ov_dir] if _is_valid_openvino_dir(ov_dir) else []
 
         pt_files = [os.path.join(pt_dir, name) for name in preferred_pt_names]
         if os.path.isdir(pt_dir):
@@ -97,34 +311,68 @@ def _collect_model_candidates(base_dirs, model_folder, preferred_pt_names):
                     full_p = os.path.join(pt_dir, f)
                     if full_p not in pt_files:
                         pt_files.append(full_p)
-        candidates.extend([p for p in pt_files if os.path.isfile(p)])
+        pt_candidates = [p for p in pt_files if os.path.isfile(p)]
+
+        if mode == "directml":
+            candidates.extend(onnx_candidates)
+            candidates.extend(ov_candidates)
+            candidates.extend(pt_candidates)
+        elif mode == "cuda":
+            candidates.extend(pt_candidates)
+            candidates.extend(onnx_candidates)
+            candidates.extend(ov_candidates)
+        else:
+            candidates.extend(ov_candidates)
+            candidates.extend(onnx_candidates)
+            candidates.extend(pt_candidates)
     return candidates
+
 
 # --- NẠP MÔ HÌNH THÍCH ỨNG PHẦN CỨNG (ADAPTIVE HARDWARE-AWARE MODEL SELECTION) ---
 def load_yolo_model():
+    global _DML_ENABLED, _DML_DEVICE_ID
+
     base_dirs = [config.BASE_DIR]
     if hasattr(config, 'BUNDLE_DIR') and config.BUNDLE_DIR != config.BASE_DIR:
         base_dirs.append(config.BUNDLE_DIR)
 
     res_info = check_system_resources()
 
-    # Tự động chọn mô hình theo phần cứng; cả 2 mô hình đều ưu tiên OpenVINO trước, lỗi mới fallback sang .pt
-    if res_info["has_gpu"]:
-        target_label = "YOLO26m"
+    # - Máy có GPU rời (NVIDIA RTX / AMD) + DirectML: chọn YOLO26m (ONNX + DirectML)
+    # - Máy có NVIDIA CUDA (môi trường dev torch+cu): chọn YOLO26m (.pt CUDA)
+    # - Máy không có GPU rời (Intel iGPU / CPU): chọn YOLO26s (OpenVINO)
+    if res_info["use_directml"]:
+        mode = "directml"
+        target_label = f"YOLO26m (ONNX DirectML - DX12 GPU #{res_info['dml_device_id']})"
         model_candidates = (
-            _collect_model_candidates(base_dirs, "yolo26m", ["yolo26m.pt", "best.pt"])
-            + _collect_model_candidates(base_dirs, "yolo26s", ["train-railway-yolo26s-all.pt", "yolo26s.pt"])
+            _collect_model_candidates(base_dirs, "yolo26m", ["yolo26m.pt", "best.pt"], ["yolo26m.onnx"], mode="directml")
+            + _collect_model_candidates(base_dirs, "yolo26s", ["train-railway-yolo26s-all.pt", "yolo26s.pt"], ["train-railway-yolo26s-all.onnx", "yolo26s.onnx"], mode="directml")
+        )
+    elif res_info["has_cuda"]:
+        mode = "cuda"
+        target_label = "YOLO26m (PyTorch CUDA)"
+        model_candidates = (
+            _collect_model_candidates(base_dirs, "yolo26m", ["yolo26m.pt", "best.pt"], ["yolo26m.onnx"], mode="cuda")
+            + _collect_model_candidates(base_dirs, "yolo26s", ["train-railway-yolo26s-all.pt", "yolo26s.pt"], ["train-railway-yolo26s-all.onnx", "yolo26s.onnx"], mode="cuda")
         )
     else:
-        target_label = "YOLO26s"
+        mode = "openvino"
+        target_label = "YOLO26s (OpenVINO Intel iGPU / CPU)"
         model_candidates = (
-            _collect_model_candidates(base_dirs, "yolo26s", ["train-railway-yolo26s-all.pt", "yolo26s.pt"])
-            + _collect_model_candidates(base_dirs, "yolo26m", ["yolo26m.pt", "best.pt"])
+            _collect_model_candidates(base_dirs, "yolo26s", ["train-railway-yolo26s-all.pt", "yolo26s.pt"], ["train-railway-yolo26s-all.onnx", "yolo26s.onnx"], mode="openvino")
+            + _collect_model_candidates(base_dirs, "yolo26m", ["yolo26m.pt", "best.pt"], ["yolo26m.onnx"], mode="openvino")
         )
 
     print("=" * 78)
     print(" HỆ THỐNG PHÂN TÍCH TÀI NGUYÊN & TỰ ĐỘNG CHỌN MÔ HÌNH (ADAPTIVE SELECTION)")
-    print(f"[*] Card đồ họa rời (NVIDIA GPU) : {res_info['gpu_name'] if res_info['has_gpu'] else 'Không có (Dùng Intel iGPU / CPU)'}")
+    print(f"[*] AI Runtime                   : OpenVINO + ONNX DirectML ({res_info['ort_version'] or 'Chưa cài'} | DirectML: {'Có' if res_info['has_dml'] else 'Không'})")
+    if res_info["discrete_gpu"]:
+        vram_gb = res_info["discrete_gpu"]["vram_mb"] / 1024.0
+        print(f"[*] Card đồ họa rời (GPU)        : {res_info['gpu_name']} ({vram_gb:.1f} GB VRAM, Adapter #{res_info['dml_device_id']})")
+    elif res_info["has_cuda"]:
+        print(f"[*] Card đồ họa rời (NVIDIA GPU) : {res_info['gpu_name']}")
+    else:
+        print("[*] Card đồ họa rời (GPU)        : Không có (Dùng Intel iGPU / CPU)")
     print(f"[*] Chiến lược chọn mô hình      : {target_label}")
     print("=" * 78)
 
@@ -132,20 +380,42 @@ def load_yolo_model():
     for p in model_candidates:
         if not os.path.exists(p):
             continue
-        is_ov = "openvino" in p.lower()
-        device = get_optimal_device() if is_ov else ("cuda" if res_info["has_gpu"] else "cpu")
+        p_lower = p.lower()
+        is_onnx = p_lower.endswith(".onnx")
+        is_ov = "openvino" in p_lower
+
+        if is_onnx:
+            use_dml_here = bool(res_info["has_dml"] and (mode == "directml" or res_info["discrete_gpu"] is not None))
+            _DML_ENABLED = use_dml_here
+            _DML_DEVICE_ID = res_info["dml_device_id"]
+            device = "cpu"  # Ultralytics pre/post-process trên CPU; ONNX Runtime chạy neural net trên GPU qua DirectML
+            device_desc = f"DirectML GPU #{_DML_DEVICE_ID} ({res_info['gpu_name']})" if use_dml_here else "ONNX CPU"
+        elif is_ov:
+            _DML_ENABLED = False
+            device = get_optimal_device()
+            device_desc = f"OpenVINO ({device})"
+        else:
+            _DML_ENABLED = False
+            device = "cuda:0" if res_info["has_cuda"] else "cpu"
+            device_desc = f"PyTorch ({device})"
+
         try:
             if is_ov:
-                # Kiểm tra khả năng đọc đồ thị OpenVINO IR trước khi nạp để bắt lỗi sớm và fallback sang .pt nếu lỗi
                 xml_files = [os.path.join(p, f) for f in os.listdir(p) if f.endswith(".xml")]
                 ov.Core().read_model(xml_files[0])
-            model_instance = YOLO(p)
-            active_name = "YOLO26m" if "yolo26m" in p.lower() else "YOLO26s"
-            print(f"[*] Đã nạp thành công mô hình {active_name}: {p} trên thiết bị {device}")
+            model_instance = YOLO(p, task="detect") if (is_onnx or is_ov) else YOLO(p)
+            if is_onnx:
+                # Khởi tạo & xác thực phiên ONNX DirectML ngay lúc khởi động (nếu lỗi sẽ tự fallback sang OpenVINO)
+                dummy = np.zeros((640, 640, 3), dtype=np.uint8)
+                model_instance.predict(source=dummy, imgsz=640, device=device, verbose=False)
+            elif not is_ov and device.startswith("cuda"):
+                model_instance.to(device)
+            active_name = "YOLO26m" if "yolo26m" in p_lower else "YOLO26s"
+            print(f"[*] Đã nạp thành công mô hình {active_name}: {p} trên {device_desc}")
             return model_instance, device, active_name
         except Exception as e:
             last_error = e
-            print(f"[!] Không thể nạp {p} ({e}) -> Tự động chuyển sang phương án dự phòng...")
+            print(f"[!] Không thể nạp {p} trên {device_desc} ({e}) -> Tự động chuyển sang phương án dự phòng...")
 
     raise FileNotFoundError(
         f"Không thể nạp bất kỳ mô hình hợp lệ nào trong models/yolo26s hoặc models/yolo26m (Lỗi cuối: {last_error})"

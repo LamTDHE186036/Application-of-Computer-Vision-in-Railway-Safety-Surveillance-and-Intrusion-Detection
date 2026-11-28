@@ -2,7 +2,7 @@
 
 **RailSafe CV — Phiên Bản Phát Hành: v1.3.0 (Release v1.3.0)**
 
-> Hệ thống giám sát an toàn và cảnh báo xâm phạm hành lang đường ngang đường sắt thời gian thực ứng dụng thị giác máy tính với cơ chế **chọn mô hình thích ứng phần cứng (Adaptive Hardware-Aware Selection: `YOLO26m` cho NVIDIA CUDA GPU / `YOLO26s` OpenVINO FP16 cho Intel Iris Xe iGPU & CPU)** kết hợp **ByteTrack**, hỗ trợ đồng thời **Tải video kiểm thử** và **Camera trực tiếp (Webcam / USB / OBS Virtual Camera)** với cơ chế đệm chống trễ (**Zero-Latency Capture**), hộp đen ghi hình sạch và trình phát lại bằng chứng qua lớp phủ siêu dữ liệu (**Spotlight Canvas Overlay**).
+> Hệ thống giám sát an toàn và cảnh báo xâm phạm hành lang đường ngang đường sắt thời gian thực ứng dụng thị giác máy tính với cơ chế **chọn mô hình thích ứng phần cứng (Adaptive Hardware-Aware Selection: `YOLO26m` ONNX DirectML cho GPU rời NVIDIA RTX / AMD Radeon & `YOLO26s` OpenVINO FP16 cho Intel Iris Xe iGPU / CPU)** kết hợp **ByteTrack**, hỗ trợ đồng thời **Tải video kiểm thử** và **Camera trực tiếp (Webcam / USB / OBS Virtual Camera)** với cơ chế đệm chống trễ (**Zero-Latency Capture**), hộp đen ghi hình sạch và trình phát lại bằng chứng qua lớp phủ siêu dữ liệu (**Spotlight Canvas Overlay**).
 
 ---
 
@@ -26,9 +26,9 @@
 Đường ngang giao cắt giữa đường sắt và đường bộ là một trong những điểm nóng tiềm ẩn nguy cơ tai nạn giao thông nghiêm trọng nhất trong mạng lưới đường sắt Việt Nam. Đề tài được nghiên cứu và phát triển nhằm cung cấp giải pháp giám sát tự động, thông minh, vận hành liên tục theo thời gian thực (Real-time) để hỗ trợ điều độ viên và nhân viên gác chắn đường sắt:
 
 - **Tự động nhận diện đa đối tượng (5 lớp đường sắt):** Nhận diện chính xác 4 lớp chướng ngại vật xâm phạm hành lang an toàn (**Người**, **Ô tô**, **Xe máy**, **Xe tải/Xe buýt**), đồng thời nhận diện **Đoàn tàu hỏa** (`train`) để kích hoạt bộ lọc loại trừ thông minh (không vẽ đè khung, không báo động sai lên tàu và tự động thu hồi trạng thái nếu đầu tàu bị nhận nhầm tạm thời).
-- **Chọn mô hình thích ứng phần cứng (`YOLO26m` + `YOLO26s` — Ưu tiên OpenVINO, dự phòng `.pt`):**
-  - Tự động chọn **`YOLO26m`** trên máy có GPU rời NVIDIA (ưu tiên **OpenVINO FP16**, tự động fallback sang `.pt` nếu OpenVINO lỗi) để đạt độ chính xác tối đa (**`85.96%` mAP@0.5**, **`72.47%` mAP@0.5:0.95**).
-  - Tự động chọn **`YOLO26s`** trên máy không có GPU rời (ưu tiên **OpenVINO FP16** trên Intel Iris Xe iGPU/CPU, tự động fallback sang `.pt` nếu OpenVINO lỗi) để đạt tốc độ **Real-Time `30.8 FPS` (`32.51 ms`)**.
+- **Chọn mô hình thích ứng phần cứng (`YOLO26m` ONNX DirectML + `YOLO26s` OpenVINO FP16):**
+  - Tự động dò phần cứng GPU qua **Windows DXGI** và chọn **`YOLO26m`** trên máy có GPU rời (**NVIDIA RTX/GTX, AMD Radeon RX…**), chạy trực tiếp trên GPU rời qua **ONNX Runtime DirectML (DirectX 12)** (tự động fallback sang OpenVINO / `.pt` nếu lỗi) để đạt độ chính xác tối đa (**`85.96%` mAP@0.5**, **`72.47%` mAP@0.5:0.95**) mà **không cần cài hay đóng gói ~3.4 GB CUDA Toolkit**.
+  - Tự động chọn **`YOLO26s`** trên máy không có GPU rời (ưu tiên **OpenVINO FP16** trên Intel Iris Xe iGPU/CPU, tự động fallback sang ONNX / `.pt` nếu OpenVINO lỗi) để đạt tốc độ **Real-Time `30.8 FPS` (`32.51 ms`)**.
 - **Theo dõi quỹ đạo và đo đếm dừng đỗ (ByteTrack & Dwell Time):** Tích hợp giải thuật ByteTrack siêu nhẹ (`+0.27 ms` overhead trên `YOLO26s`), duy trì định danh (Track ID) bền bỉ khi đối tượng bị che khuất tạm thời.
 - **Hai chế độ vận hành chuyên biệt:**
   - *Chế độ "Tàu sắp tới" (`train_approaching`):* Trạng thái nguy cấp, cảnh báo tức thì khi có người hoặc phương tiện bước vào vùng nguy hiểm ($\ge 0.5$ giây xác nhận chống nhiễu).
@@ -37,10 +37,10 @@
 - **Hộp đen bằng chứng và lớp phủ Spotlight:** Ghi hình không phá hủy (Clean Video) kèm tệp siêu dữ liệu JSON đồng bộ từng khung hình, cho phép xem lại từng đối tượng vi phạm với hiệu ứng khoét sáng (Spotlight), làm tối nền xung quanh và tự động tua đến đúng khoảnh khắc xâm phạm.
 
 ### 1.2. Những cải tiến nổi bật trong Phiên bản v1.3.0
-1. **Cơ chế Chọn Mô hình Thích ứng Phần cứng (Adaptive Hardware-Aware Model Selection):**
-   - Nâng cấp `app/services/detector.py` tự động dò GPU rời NVIDIA CUDA để kích hoạt **`YOLO26m`** (`models/yolo26m/`), và tự động dùng **`YOLO26s` OpenVINO FP16** (`models/yolo26s/`) trên máy Intel iGPU/CPU — cân bằng tối ưu giữa độ chính xác và tốc độ Real-Time trên mọi cấu hình triển khai.
-2. **Bổ sung mô hình `YOLO26m` chuẩn PyTorch & Intel OpenVINO FP16:**
-   - Hoàn thiện bộ công cụ `models/yolo26m/export_openvino.py` và lưu trữ sẵn trọng số OpenVINO FP16 tại `models/yolo26m/model_openvino/`.
+1. **Cơ chế Chọn Mô hình Thích ứng Phần cứng (Adaptive Hardware-Aware Model Selection — OpenVINO + ONNX DirectML):**
+   - Nâng cấp `app/services/detector.py` tự động liệt kê bộ điều hợp đồ họa qua **Windows DXGI (`CreateDXGIFactory1`)** để nhận diện chính xác GPU rời (NVIDIA RTX 2050/3050/4060, AMD Radeon RX…) cùng đúng chỉ số `device_id`, kích hoạt **`YOLO26m`** qua **ONNX Runtime DirectML (`DmlExecutionProvider`)**; đồng thời tự động dùng **`YOLO26s` OpenVINO FP16** (`models/yolo26s/`) trên máy Intel iGPU/CPU.
+2. **Bổ sung đầy đủ trọng số PyTorch, Intel OpenVINO FP16 và ONNX (`YOLO26m` & `YOLO26s`):**
+   - Hoàn thiện bộ trọng số OpenVINO FP16 (`model_openvino/`) và ONNX opset 17 (`model_onnx/`) cho cả `YOLO26m` và `YOLO26s`, hỗ trợ tăng tốc GPU rời qua DirectX 12 hoàn toàn offline mà không phụ thuộc bộ thư viện CUDA nặng.
 3. **Chuẩn hóa toàn bộ 5 Thực nghiệm Khoa học (`exp1`–`exp5`) phục vụ Chương 4 báo cáo:**
    - **Thực nghiệm 1:** Gộp đánh giá đối đầu **3 mô hình** (`YOLO11s` vs `YOLO26s` vs `YOLO26m`) trên 404 ảnh kiểm thử độc lập kèm 3 biểu đồ trực quan.
    - **Thực nghiệm 2 & 3:** Nâng cấp đánh giá Tracking MOT và Tăng tốc Phần cứng đồng thời cho **cả `YOLO26s` lẫn `YOLO26m`**, sửa lỗi giữ nguyên warmup trên cùng instance mô hình để đo chính xác Tracking Overhead.
@@ -48,8 +48,8 @@
    - **Thực nghiệm 5:** Đo phân rã thời gian chạy toàn luồng Web (`cap.read → model.track → process_and_draw → MJPEG`), phân tích định lượng ca báo sót ROI và cung cấp bộ chấm điểm cấp sự kiện ngoại tuyến (`tIoU`, `Event P/R/F1`, `FAR`, `Delay`).
 4. **Kế thừa trọn vẹn các tối ưu cốt lõi từ v1.2.1:**
    - Khắc phục triệt để lỗi lồng 2 lớp ROI (Double-ROI Bugfix), quét DirectShow đa nguồn Camera (Webcam / USB / OBS Virtual Camera) + chuyển nóng cổng camera, `LiveCameraCapture` Zero-Latency Buffer=1, Single Instance Mutex & Single-Tab Lock.
-5. **Đóng gói phát hành đồng bộ v1.3.0:**
-   - Script `build_release.py` đóng gói kèm đồng bộ cả 2 thư mục mô hình `models/yolo26s` và `models/yolo26m`, tạo bộ cài đặt `Setup_RailwaySafety_v1.3.0.exe` qua Inno Setup (tích hợp sẵn Microsoft Visual C++ Redistributable).
+5. **Đóng gói phát hành gọn nhẹ 1 tệp `.exe` duy nhất v1.3.0 (100% Offline):**
+   - Script `build_release.py` đóng gói kèm **PyTorch CPU gọn nhẹ + Intel OpenVINO + ONNX Runtime DirectML (`DirectML.dll`)** cùng đồng bộ cả 2 thư mục mô hình `models/yolo26s` và `models/yolo26m`, tạo bộ cài đặt 1 tệp duy nhất `Setup_RailwaySafety_v1.3.0.exe` qua Inno Setup (tích hợp sẵn Microsoft Visual C++ Redistributable, chạy GPU rời lẫn Intel iGPU/CPU hoàn toàn không cần mạng).
 
 ---
 
@@ -57,8 +57,8 @@
 
 ### 2.1. Nhận diện và bám vết đa đối tượng thời gian thực
 - Hỗ trợ 2 mô hình thế hệ YOLO26 huấn luyện trên tập dữ liệu đường sắt chuẩn 5 lớp (`0: car`, `1: motorcycle`, `2: person`, `3: truck-bus`, `4: train`):
-  - **`YOLO26m`** *(tự chọn khi có NVIDIA CUDA GPU)*: Độ chính xác cao nhất (`85.96%` mAP@0.5, `72.47%` mAP@0.5:0.95).
-  - **`YOLO26s`** *(tự chọn trên Intel iGPU / CPU)*: Tốc độ Real-Time (`30.8 FPS` / `32.51 ms` qua OpenVINO FP16 Intel Iris Xe).
+  - **`YOLO26m`** *(tự chọn khi có GPU rời NVIDIA RTX / AMD qua ONNX DirectML)*: Độ chính xác cao nhất (`85.96%` mAP@0.5, `72.47%` mAP@0.5:0.95).
+  - **`YOLO26s`** *(tự chọn trên Intel iGPU / CPU qua OpenVINO FP16)*: Tốc độ Real-Time (`30.8 FPS` / `32.51 ms` trên Intel Iris Xe).
 - **4 lớp chướng ngại vật xâm phạm:** `person`, `car`, `motorcycle`, `truck-bus` có thể bật/tắt linh hoạt trong mục **Cài đặt**.
 - **Bộ lọc tàu hỏa (Train Filter):** Tàu hỏa lưu thông hợp lệ trên ray được tự động loại trừ hoàn toàn: không vẽ khung bounding box đè lên thân tàu, không kích hoạt báo động sai và tự động gỡ trạng thái/nhật ký tạm nếu đầu tàu bị nhận nhầm khi mới tiến vào khung hình.
 - **Giải thuật ByteTrack:** Liên kết hộp bao 2 giai đoạn kết hợp bộ lọc Kalman Filter, duy trì định danh bền bỉ với chi phí tính toán siêu nhẹ (`+0.27 ms` trên `YOLO26s`).
@@ -97,9 +97,9 @@ flowchart TD
     end
 
     subgraph INFERENCE ["2. Chọn mô hình thích ứng & Suy luận AI"]
-        HW{"Dò phần cứng (CUDA GPU?)"}
-        M26["YOLO26m (Ưu tiên OpenVINO FP16 · fallback .pt CUDA · mAP50 85.96%)"]
-        S26["YOLO26s (Ưu tiên OpenVINO FP16 · fallback .pt CPU · 30.8 FPS)"]
+        HW{"Dò phần cứng DXGI (GPU rời?)"}
+        M26["YOLO26m (ONNX DirectML DX12 · fallback OpenVINO / CUDA · mAP50 85.96%)"]
+        S26["YOLO26s (OpenVINO FP16 Intel iGPU / CPU · fallback ONNX / .pt · 30.8 FPS)"]
         BT["ByteTrack Multi-Object Tracker (+0.27 ms)"]
     end
 
@@ -125,7 +125,7 @@ flowchart TD
 
     CAM --> CAP --> HW
     FILE --> HW
-    HW -- "Có CUDA" --> M26 --> BT
+    HW -- "Có GPU rời (RTX / AMD)" --> M26 --> BT
     HW -- "Intel iGPU / CPU" --> S26 --> BT
     BT --> TF --> ROI --> DWELL --> MODE
     MODE --> STREAM --> LIVE_VIEW
@@ -160,7 +160,7 @@ RailSafe-CV/
 │   │   ├── history.py               # API tra cứu lịch sử (ghép nối 4 tầng), xuất MP4/MJPEG và JSON
 │   │   └── settings.py              # API cập nhật ROI, conf, dwell_time, classes, quét & đổi camera
 │   ├── services/                    # Tầng nghiệp vụ xử lý AI và phân tích
-│   │   ├── detector.py              # Chọn mô hình thích ứng (YOLO26m CUDA / YOLO26s OpenVINO), hộp đen
+│   │   ├── detector.py              # Chọn mô hình thích ứng (YOLO26m ONNX DirectML / YOLO26s OpenVINO), hộp đen
 │   │   └── tracker.py               # Xử lý giao cắt đa giác ROI lai và đánh giá thời gian dừng đỗ
 │   └── utils/                       # Module tiện ích dùng chung
 │       ├── camera_utils.py          # Quét DirectShow camera (Webcam/USB/OBS) & LiveCameraCapture
@@ -180,10 +180,12 @@ RailSafe-CV/
 │   ├── yolo26s/                     # Mô hình Edge Real-Time (Intel Iris Xe iGPU / CPU)
 │   │   ├── model_pytorch/           # Trọng số gốc PyTorch (train-railway-yolo26s-all.pt)
 │   │   ├── model_openvino/          # Trọng số tối ưu hóa OpenVINO FP16 (.xml, .bin, metadata.yaml)
+│   │   ├── model_onnx/              # Trọng số ONNX opset 17 dự phòng DirectML (train-railway-yolo26s-all.onnx)
 │   │   └── export_openvino.py       # Script xuất OpenVINO cho YOLO26s
-│   └── yolo26m/                     # Mô hình High-Accuracy (NVIDIA CUDA GPU)
+│   └── yolo26m/                     # Mô hình High-Accuracy (GPU rời NVIDIA RTX / AMD qua ONNX DirectML)
 │       ├── model_pytorch/           # Trọng số gốc PyTorch (yolo26m.pt)
 │       ├── model_openvino/          # Trọng số tối ưu hóa OpenVINO FP16 (.xml, .bin, metadata.yaml)
+│       ├── model_onnx/              # Trọng số ONNX opset 17 chạy DirectML DX12 (yolo26m.onnx)
 │       └── export_openvino.py       # Script xuất OpenVINO cho YOLO26m
 │
 ├── experiments/                     # Quy trình nghiên cứu khoa học và 5 thực nghiệm đối chứng
@@ -310,8 +312,8 @@ Dự án được kiểm chứng qua 5 thực nghiệm đối chứng chuẩn h�
 - **Phiên bản Python:** Python 3.10 hoặc 3.11.
 - **Cấu hình phần cứng khuyến nghị:**
   - **Cấu hình tiêu chuẩn (tự chạy `YOLO26s` OpenVINO):** Intel Core i3 / i5 / i7 thế hệ 11 trở lên tích hợp Intel Iris Xe Graphics, RAM $\ge 8$ GB (khuyến nghị 16 GB).
-  - **Cấu hình máy trạm hiệu năng cao (tự chạy `YOLO26m` CUDA):** GPU rời NVIDIA hỗ trợ CUDA, RAM $\ge 16$ GB.
-  - Dung lượng ổ cứng trống tối thiểu `5 GB`.
+  - **Cấu hình máy trạm có GPU rời (tự chạy `YOLO26m` ONNX DirectML):** Card đồ họa rời NVIDIA (GTX 16xx / RTX 2050 / 3050 / 4060…) hoặc AMD Radeon RX hỗ trợ DirectX 12, RAM $\ge 16$ GB (không cần cài CUDA Toolkit).
+  - Dung lượng ổ cứng trống tối thiểu `2 GB` (khuyến nghị `5 GB` để lưu trữ video vi phạm).
 
 ### 6.2. Các bước cài đặt môi trường
 ```bash
@@ -340,7 +342,7 @@ Giao diện người dùng thiết kế dạng Single Page Application (100% off
   ```bash
   python main.py
   ```
-- Hệ thống tự động kiểm tra phần cứng để nạp `YOLO26m` (CUDA) hoặc `YOLO26s` (OpenVINO iGPU/CPU), dò cổng trống (ưu tiên `5000`) và mở trình duyệt tại `http://127.0.0.1:5000/`.
+- Hệ thống tự động kiểm tra phần cứng qua DXGI để nạp `YOLO26m` (ONNX DirectML trên GPU rời NVIDIA/AMD) hoặc `YOLO26s` (OpenVINO trên Intel iGPU/CPU), dò cổng trống (ưu tiên `5000`) và mở trình duyệt tại `http://127.0.0.1:5000/`.
 
 ### 7.3. Thiết lập nguồn dữ liệu đầu vào
 1. **Tải video:** Chọn tab **Tải video**, kéo thả hoặc chọn tệp (`MP4, AVI, MKV, MOV`, tối đa **2 GB**). Khung hình đầu tiên hiển thị làm ảnh xem trước để vẽ ROI.
@@ -360,16 +362,17 @@ Giao diện người dùng thiết kế dạng Single Page Application (100% off
 
 ## 8. Hướng dẫn đóng gói ứng dụng (Windows)
 
-### Bước 1: Đóng gói bằng PyInstaller
+### Bước 1: Đóng gói bằng PyInstaller (Kèm OpenVINO + ONNX Runtime DirectML)
 ```bash
-python build_release.py
+# Đảm bảo đã cài onnxruntime-directml và PyTorch bản CPU gọn nhẹ (không kèm ~3.4 GB CUDA DLL)
+python build_release.py --require-directml
 ```
-Script tự động chạy PyInstaller theo `RailwaySafety.spec`, loại trừ `~450 MB` thư viện không dùng đến, sao chép đồng bộ cả 2 mô hình `models/yolo26s` và `models/yolo26m`, cấu hình `configs/`, âm thanh `audio_alerts/`, công cụ `ffmpeg.exe` và xuất sản phẩm ra `dist/RailwaySafety/`.
+Script tự động kiểm tra sẵn sàng `DmlExecutionProvider` (DirectML), chạy PyInstaller theo `RailwaySafety.spec`, loại trừ các thư viện dư thừa, đóng gói gọn kèm `openvino` + `onnxruntime-directml` (`DirectML.dll`), sao chép đồng bộ cả 2 mô hình `models/yolo26s` và `models/yolo26m` (gồm `model_onnx/`, `model_openvino/`, `model_pytorch/`), cấu hình `configs/`, âm thanh `audio_alerts/`, công cụ `ffmpeg.exe` và xuất sản phẩm ra `dist/RailwaySafety/`.
 
-### Bước 2: Tạo bộ cài đặt hoàn chỉnh (Inno Setup)
-1. Cài đặt **Inno Setup 6**.
-2. Mở tệp `RailwaySafety_Installer.iss` và nhấn **Compile** (`Ctrl + F9`).
-3. Bộ cài đặt `Output/Setup_RailwaySafety_v1.3.0.exe` sẽ được tạo ra, tích hợp sẵn Microsoft Visual C++ Redistributable.
+### Bước 2: Tạo bộ cài đặt hoàn chỉnh 1 tệp `.exe` duy nhất (Inno Setup)
+1. Cài đặt **Inno Setup 6** hoặc **Inno Setup 7**.
+2. Mở tệp `RailwaySafety_Installer.iss` và nhấn **Compile** (`Ctrl + F9`) *(hoặc chạy lệnh `ISCC.exe RailwaySafety_Installer.iss`)*.
+3. Bộ cài đặt 1 tệp duy nhất `Output/Setup_RailwaySafety_v1.3.0.exe` sẽ được tạo ra (tích hợp sẵn Microsoft Visual C++ Redistributable, chạy hoàn toàn offline trên cả máy có GPU rời RTX/AMD lẫn máy Intel iGPU/CPU).
 
 ---
 

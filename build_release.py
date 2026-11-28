@@ -20,6 +20,33 @@ def build():
     print(f"   TIẾN HÀNH ĐÓNG GÓI SẢN PHẨM V{APP_VERSION} BẰNG PYINSTALLER")
     print("=" * 70)
 
+    # 0. Kiểm tra cấu hình AI Runtime (ONNX DirectML + OpenVINO + PyTorch) trước khi đóng gói
+    try:
+        import torch
+        torch_ver = getattr(torch, "__version__", "unknown")
+        torch_cuda = getattr(torch.version, "cuda", None)
+        if torch_cuda:
+            print(f"[!] LƯU Ý: PyTorch đang là bản CUDA ({torch_ver}) -> gói build sẽ nặng thêm ~2.5 GB.")
+            print("    Nếu muốn bộ cài gọn ~400MB (1 file .exe, vẫn chạy GPU rời qua ONNX DirectML), hãy cài PyTorch CPU:")
+            print("    pip install --force-reinstall --no-deps torch==2.4.1+cpu torchvision==0.19.1+cpu --index-url https://download.pytorch.org/whl/cpu")
+        else:
+            print(f"[*] PyTorch đóng gói: {torch_ver} (gọn nhẹ, không kèm 3.4GB CUDA DLL)")
+    except Exception as e:
+        print(f"[!] Không thể kiểm tra phiên bản PyTorch: {e}")
+
+    try:
+        import onnxruntime as ort
+        providers = ort.get_available_providers()
+        has_dml = "DmlExecutionProvider" in providers
+        print(f"[*] ONNX Runtime    : {ort.__version__} | DirectML GPU: {'CÓ (NVIDIA RTX / AMD / Intel DX12)' if has_dml else 'KHÔNG'}")
+        if not has_dml and "--require-directml" in sys.argv:
+            print("[!] Hủy đóng gói: thiếu onnxruntime-directml (DmlExecutionProvider).")
+            sys.exit(1)
+    except Exception as e:
+        print(f"[!] Cảnh báo ONNX Runtime DirectML chưa sẵn sàng: {e}")
+        if "--require-directml" in sys.argv:
+            sys.exit(1)
+
     # 1. Chạy PyInstaller
     cmd = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "RailwaySafety.spec"]
     print(f"[*] Đang chạy lệnh: {' '.join(cmd)}")

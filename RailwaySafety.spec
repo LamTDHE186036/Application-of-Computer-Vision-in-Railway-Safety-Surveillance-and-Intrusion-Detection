@@ -10,16 +10,19 @@ datas = [
 ]
 datas += collect_data_files('ultralytics')
 datas += collect_data_files('openvino')
+datas += collect_data_files('onnxruntime')
 
-# Thu thập thư viện động C++/DLLs của OpenVINO (ffmpeg.exe được quản lý ngoài thư mục app bởi build_release.py, tránh đóng gói nhân đôi ~88MB)
+# Thu thập thư viện động C++/DLLs của OpenVINO và ONNX Runtime DirectML (DirectML.dll)
 binaries = []
 binaries += collect_dynamic_libs('openvino')
+binaries += collect_dynamic_libs('onnxruntime')
 
-# Thu thập các module ẩn (dynamic imports của YOLO & OpenVINO)
+# Thu thập các module ẩn (dynamic imports của YOLO, OpenVINO & ONNX Runtime DirectML)
 hiddenimports = [
     'cv2',
     'torch',
     'torchvision',
+    'onnxruntime',
 ]
 hiddenimports += collect_submodules('ultralytics')
 hiddenimports += collect_submodules('openvino')
@@ -36,13 +39,13 @@ excludes = [
     'pip',
     'setuptools',
     'wheel',
-    # Thư viện phân tích dữ liệu không sử dụng (Tiết kiệm ~360MB)
+    # Thư viện phân tích dữ liệu / xuất model không sử dụng lúc chạy thực tế
     'polars',
     '_polars_runtime_32',
     'pyarrow',
     'llvmlite',
     'numba',
-    'onnxruntime',
+    'onnx',
     # Tránh nhân đôi ffmpeg.exe (~84MB) vì ffmpeg.exe đã được quản lý ngoài thư mục app
     'imageio_ffmpeg',
 ]

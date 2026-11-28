@@ -2,8 +2,11 @@ flask>=2.0.0
 ultralytics>=8.0.0
 opencv-python>=4.8.0
 openvino>=2024.0.0
+onnxruntime-directml>=1.19.0
 numpy
+# Dùng PyTorch bản CPU gọn nhẹ; GPU rời (NVIDIA RTX / AMD) chạy qua onnxruntime-directml (DirectX 12)
 torch
+torchvision
 pandas
 imageio-ffmpeg
 # pyinstaller>=6.0.0  # (Tùy chọn) Chỉ cần khi chạy build_release.py để đóng gói .exe
